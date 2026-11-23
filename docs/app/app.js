@@ -15,7 +15,17 @@ function toast(msg, err = false) {
   const t = $("#toast"); t.textContent = msg; t.className = err ? "err" : ""; t.style.display = "block";
   clearTimeout(t._h); t._h = setTimeout(() => { t.style.display = "none"; }, err ? 4500 : 2400);
 }
-function download(name, data, type = "application/octet-stream") {
+const IOS = window.ZMSIOS, AND = window.ZMSAndroid;
+async function download(name, data, type = "application/octet-stream") {
+  if (IOS || AND) {                              // App 裡：交給 App 的分享面板／存檔
+    const u8 = data instanceof Uint8Array ? data : typeof data === "string" ? new TextEncoder().encode(data) : new Uint8Array(data);
+    let b = ""; for (let i = 0; i < u8.length; i += 0x8000) b += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    try {
+      if (IOS) await window.webkit.messageHandlers.zms.postMessage({ cmd: "save_file", args: [name, btoa(b)] });
+      else AND.saveFile(name, btoa(b));
+    } catch (e) { toast("存檔失敗：" + e, true); }
+    return;
+  }
   const url = URL.createObjectURL(new Blob([data], { type })), a = document.createElement("a");
   a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
@@ -505,6 +515,27 @@ $("#menuBtn").onclick = () => $("#side").classList.toggle("open");
 
 // ====================================================================== 啟動
 $("#ver").textContent = "v" + DATA.version;
+// iPhone／iPad、Android App：顯示 App 版本，查 GitHub 最新版，有新版就在上方顯示「有新版」
+const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+async function checkUpdate(manual) {
+  const app = IOS || AND; if (!app) return;
+  const asset = IOS ? "ZMSPrintAgent-ios.ipa" : "android.apk";
+  try {
+    const r = await fetch(`https://api.github.com/repos/${DATA.repo}/releases/latest`), j = await r.json();
+    const latest = (j.tag_name || "").replace(/^v/, ""), has = (j.assets || []).some((a) => a.name.endsWith(asset));
+    if (latest && has && newer(latest, app.version)) {
+      $("#upd").textContent = `⬆ 有新版 v${latest}`; $("#upd").classList.add("show");
+      if (manual) $("#upd").click();
+    } else if (manual) toast("已經是最新版 v" + app.version);
+  } catch (e) { if (manual) toast("檢查更新需要網路", true); }
+}
+if (IOS || AND) {
+  document.documentElement.classList.add(IOS ? "ios-app" : "android-app", "ios-app");
+  $("#edition").textContent = IOS ? "iPhone／iPad 版" : "Android 版"; $("#ver").textContent = "v" + (IOS || AND).version;
+  $("#upd").onclick = () => { if (IOS) location.href = `https://achir1015.github.io/zms-print-agent/ios/`; else AND.installUpdate && AND.installUpdate(); };
+  $("#chkUpd").style.display = ""; $("#chkUpd").onclick = () => checkUpdate(true);
+  setTimeout(() => checkUpdate(false), 2000);
+}
 (async () => {
   try { await initEngine(); }
   catch (e) { $("#loading p").textContent = "建模引擎載入失敗（瀏覽器需要支援 WebAssembly）：" + e.message; return; }

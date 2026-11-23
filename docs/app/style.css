@@ -80,3 +80,8 @@ label.fld { display:flex; flex-direction:column; gap:4px; font-size:13px; color:
   .split3 > .panel:last-child { order:-1; } #rlist { max-height:210px; } #form { max-height:none; }
   .hero { flex-direction:column; text-align:center; } .hero img { display:none; }
 }
+/* iPhone／iPad：瀏海與底部橫條的安全區域 */
+header { padding-top:calc(10px + env(safe-area-inset-top)); padding-left:calc(20px + env(safe-area-inset-left)); padding-right:calc(20px + env(safe-area-inset-right)); }
+#side { padding-top:env(safe-area-inset-top); padding-bottom:env(safe-area-inset-bottom); }
+#view { padding-bottom:calc(16px + env(safe-area-inset-bottom)); }
+#upd { display:none; } .ios-app #upd.show { display:inline-flex; }

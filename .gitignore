@@ -34,3 +34,4 @@ ios/web/
 ios/*.xcodeproj/
 secrets.json
 tests/_db/
+ios/build/
