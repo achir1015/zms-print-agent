@@ -1,103 +1,106 @@
-"""產生線上版（GitHub Pages，docs/）用到的資料與素材。
+"""產生線上版（GitHub Pages：docs/）需要的資料與檔案。
 
-* docs/img/：程式圖示（PWA 192／512、apple-touch-icon 180）、計算尺知識的圖片
-* docs/voice/<課程>.mp3：語音動態教學旁白（從 assets/voice 複製）
-* docs/voice/demo/*.mp3＋docs/app/data.js：常用算式示範每一步的語音（微軟神經語音 曉臻，免費）、
-  課程文字、計算尺知識內容 → 線上版不必連任何伺服器；沒有預錄的算式改用瀏覽器內建語音
+* docs/app/data.js：印表機（可用列印範圍）、耗材、參數化零件的參數表、語音教學課程與各頁說明 — 都從 Python 程式產生，
+  兩個版本共用同一份定義（零件的建模程式在 docs/app/engine.js，要和 pa/recipes.py 一起改）。
+* docs/voice/：語音教學 MP3（從 assets/voice 複製）。
+* docs/icon.png、docs/app/icon.png。
+* docs/app/lib/：three.js、manifold-3d（wasm）— 用 --libs 從 npm 下載（需要 Node 22）。
 
-用法：.venv\\Scripts\\python tools\\make_pages.py   （產生示範語音需要網路；已存在的檔案會略過）
+用法：python tools/make_pages.py [--libs]
 """
-import asyncio
-import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
+import tempfile
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, HERE)
 
-from PIL import Image  # noqa: E402
-
-from pa import APP_VERSION  # noqa: E402
-from pa.demo import PRESETS, plan  # noqa: E402
-from pa.help_text import LESSONS  # noqa: E402
-from pa.voice import VOICE  # noqa: E402
+from pa import APP_NAME, APP_VERSION, GITHUB_REPO, checks, recipes  # noqa: E402
+from pa.help_text import LESSONS, PAGES  # noqa: E402
+from bambu_studio_ai import hardware  # noqa: E402
 
 DOCS = os.path.join(HERE, "docs")
+APP = os.path.join(DOCS, "app")
+NODE = os.path.expandvars(r"%LOCALAPPDATA%\nvm\v22.22.3")
+LIBS = {  # npm 套件版本固定
+    "manifold-3d": "3.5.5", "three": "0.180.0",
+}
+# 只有電腦版能做的畫面：線上版另外處理
+WEB_PAGES = ("home", "agent", "design", "library", "check", "convert", "search", "aiset", "help")
 
 
-def icons():
-    out = os.path.join(DOCS, "img")
-    os.makedirs(out, exist_ok=True)
-    src = Image.open(os.path.join(HERE, "assets", "icon.png")).convert("RGBA")
-    for name, size in (("icon-512.png", 512), ("icon-192.png", 192), ("favicon-64.png", 64)):
-        src.resize((size, size), Image.LANCZOS).save(os.path.join(out, name))
-    # apple-touch-icon 不能透明：鋪上系列的深藍底
-    bg = Image.new("RGBA", src.size, (15, 60, 110, 255))
-    Image.alpha_composite(bg, src).convert("RGB").resize((180, 180), Image.LANCZOS).save(
-        os.path.join(out, "apple-touch-icon.png"))
-    src.resize((256, 256), Image.LANCZOS).save(os.path.join(DOCS, "icon.png"))
-    learn = os.path.join(DOCS, "img", "learn")
-    os.makedirs(learn, exist_ok=True)
-    for f in os.listdir(os.path.join(HERE, "assets", "learn")):
-        shutil.copy2(os.path.join(HERE, "assets", "learn", f), os.path.join(learn, f))
+def data():
+    prs = {}
+    for k, p in hardware.printers().items():
+        u = hardware.usable_volume(p)
+        prs[k] = {"name": p.name, "usable": [float(x) for x in u], "volume": [float(x) for x in p.build_volume_mm],
+                  "enclosed": bool(p.enclosed), "high_temp": p.max_nozzle_c >= 350}
+    mats = {}
+    for k in checks.material_keys():
+        m = hardware.materials()[k]
+        mats[k] = {"nozzle": list(m.nozzle_c), "bed": m.bed_c, "min_wall": m.min_wall_mm,
+                   "enclosure": bool(m.needs_enclosure), "high_temp": m.nozzle_c[0] > 300}
+    recs = []
+    for r in recipes.RECIPES:
+        recs.append({"id": r.id, "name": r.name, "category": r.category, "icon": r.icon, "desc": r.desc,
+                     "keywords": list(r.keywords),
+                     "params": [{"key": p.key, "label": p.label, "default": p.default, "min": p.lo, "max": p.hi,
+                                 "step": p.step, "unit": p.unit, "doc": p.doc, "kind": p.kind} for p in r.params]})
+    lessons = [{"key": x["key"], "title": x["title"], "voice": x["voice"],
+                "steps": [{"icon": s[0], "tone": s[1], "text": s[2], "page": s[3]} for s in x["steps"]]}
+               for x in LESSONS]
+    pages = {k: {"title": v[0], "voice": v[1]} for k, v in PAGES.items() if k in WEB_PAGES}
+    return {"app": APP_NAME, "version": APP_VERSION, "repo": GITHUB_REPO, "printers": prs, "materials": mats,
+            "recipes": recs, "categories": recipes.CATEGORIES, "lessons": lessons, "pages": pages,
+            "purposes": checks.PURPOSES}
 
 
-def lesson_voice():
-    out = os.path.join(DOCS, "voice")
-    os.makedirs(out, exist_ok=True)
-    for s in LESSONS:
-        shutil.copy2(os.path.join(HERE, "assets", "voice", s["key"] + ".mp3"), os.path.join(out, s["key"] + ".mp3"))
-
-
-async def demo_voice():
-    out = os.path.join(DOCS, "voice", "demo")
-    os.makedirs(out, exist_ok=True)
-    import edge_tts
-    exprs = list(PRESETS) + [s["demo"] for s in LESSONS if s.get("demo") and s["demo"] not in PRESETS]
-    index = {}
-    for e in exprs:
-        for st in plan(e)["steps"]:
-            text = st["text"]
-            name = hashlib.sha1((VOICE + text).encode("utf-8")).hexdigest()[:20] + ".mp3"
-            path = os.path.join(out, name)
-            index[text] = name
-            if os.path.isfile(path) and os.path.getsize(path) > 0:
-                continue
-            for n in range(5):
-                try:
-                    await edge_tts.Communicate(text, VOICE, rate="+5%").save(path)
-                    break
-                except Exception as ex:                    # edge-tts 偶爾回 503，稍等再試
-                    print("retry", text[:20], ex)
-                    await asyncio.sleep(3 + n * 3)
-    keep = set(index.values())
-    for f in os.listdir(out):
-        if f not in keep:
-            os.remove(os.path.join(out, f))
-    return index
-
-
-def data_js(index):
-    from pa.ui.learnview import SECTIONS, SOURCE
-    lessons = [dict(key=s["key"], title=s["title"], demo=s.get("demo") or "", voice=s["voice"],
-                    steps=[[icon, tone, text, sid] for icon, tone, text, sid in s["steps"]]) for s in LESSONS]
-    learn = [dict(title=t, img=img, cap=cap, paras=paras) for t, img, cap, paras in SECTIONS]
-    data = dict(version=APP_VERSION, voice=index, lessons=lessons, learn=learn, learn_source=SOURCE)
-    with open(os.path.join(DOCS, "app", "data.js"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("/* 由 tools/make_pages.py 產生，請勿手動修改 */\nwindow.PA_DATA = ")
-        json.dump(data, f, ensure_ascii=False, indent=1)
+def write_data():
+    os.makedirs(APP, exist_ok=True)
+    with open(os.path.join(APP, "data.js"), "w", encoding="utf-8") as f:
+        f.write("// 由 tools/make_pages.py 產生，請勿手動修改\nexport const DATA = ")
+        json.dump(data(), f, ensure_ascii=False, indent=1)
         f.write(";\n")
+    vo = os.path.join(DOCS, "voice")
+    os.makedirs(vo, exist_ok=True)
+    for n in os.listdir(os.path.join(HERE, "assets", "voice")):
+        if n.endswith(".mp3"):
+            shutil.copyfile(os.path.join(HERE, "assets", "voice", n), os.path.join(vo, n))
+    for d in (DOCS, APP):
+        shutil.copyfile(os.path.join(HERE, "assets", "icon.png"), os.path.join(d, "icon.png"))
+    print("ok data.js、voice、icon")
 
 
-def main():
-    icons()
-    lesson_voice()
-    index = asyncio.run(demo_voice())
-    data_js(index)
-    print("ok：示範語音 %d 段" % len(index))
+def fetch_libs():
+    lib = os.path.join(APP, "lib")
+    tmp = tempfile.mkdtemp(prefix="pa-weblibs-")
+    npm = os.path.join(NODE, "npm.cmd")
+    subprocess.run([npm, "init", "-y"], cwd=tmp, check=True, capture_output=True, shell=False)
+    subprocess.run([npm, "install", "--silent"] + ["%s@%s" % kv for kv in LIBS.items()], cwd=tmp, check=True)
+    nm = os.path.join(tmp, "node_modules")
+    shutil.rmtree(lib, ignore_errors=True)
+    os.makedirs(lib)
+    for n in ("manifold.js", "manifold.wasm", "LICENSE"):
+        shutil.copyfile(os.path.join(nm, "manifold-3d", n), os.path.join(lib, "manifold" + ("" if n != "LICENSE" else "-LICENSE") + (os.path.splitext(n)[1] if n != "LICENSE" else ".txt")))
+    t = os.path.join(nm, "three")
+    shutil.copyfile(os.path.join(t, "build", "three.module.min.js"), os.path.join(lib, "three.module.min.js"))
+    shutil.copyfile(os.path.join(t, "build", "three.core.min.js"), os.path.join(lib, "three.core.min.js"))
+    shutil.copyfile(os.path.join(t, "LICENSE"), os.path.join(lib, "three-LICENSE.txt"))
+    jsm = os.path.join(t, "examples", "jsm")
+    for rel in ("controls/OrbitControls.js", "loaders/GLTFLoader.js", "loaders/STLLoader.js", "loaders/OBJLoader.js",
+                "loaders/3MFLoader.js", "loaders/PLYLoader.js", "exporters/GLTFExporter.js", "utils/BufferGeometryUtils.js",
+                "libs/fflate.module.js"):
+        dst = os.path.join(lib, "jsm", rel)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copyfile(os.path.join(jsm, rel), dst)
+    shutil.rmtree(tmp, ignore_errors=True)
+    print("ok lib/", sorted(os.listdir(lib)))
 
 
 if __name__ == "__main__":
-    main()
+    if "--libs" in sys.argv:
+        fetch_libs()
+    write_data()

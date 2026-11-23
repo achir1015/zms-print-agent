@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>資料助秘3D列印AI代理人工具</title>
+<meta name="description" content="從一句描述到可以列印的零件：AI 代理人、參數化零件、七項列印前檢查、Bambu 3MF ↔ GLB。">
+<meta name="theme-color" content="#0F2747">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <div class="brand"><img src="icon.png" alt=""><div><small>資料助秘</small><b>3D列印AI代理人</b></div></div>
+    <nav id="nav"></nav>
+    <div class="side-foot">線上版 <span id="ver"></span><br>開發：吳玉柱 先生 與 Claude AI Opus 5.5</div>
+  </aside>
+  <main>
+    <header>
+      <button id="menuBtn" class="icon-btn" aria-label="選單">☰</button>
+      <div id="crumb"></div>
+      <div class="grow"></div>
+      <button id="speakBtn" class="btn outline small">🔊 本頁說明</button>
+    </header>
+    <section id="view"></section>
+  </main>
+</div>
+<div id="toast"></div>
+<div id="loading"><img src="icon.png" alt=""><p>正在載入建模引擎…</p></div>
+<script type="importmap">{"imports": {"three": "./lib/three.module.min.js"}}</script>
+<script type="module" src="app.js"></script>
+</body>
+</html>

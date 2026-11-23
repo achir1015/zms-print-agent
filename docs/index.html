@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>資料助秘3D列印AI代理人工具</title>
+<meta name="description" content="從一句描述到可以在拓竹印表機列印的零件：AI 代理人、18 種參數化零件、七項列印前檢查、Bambu 3MF ↔ GLB。">
+<meta name="theme-color" content="#0F2747">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root { --p:#1E4D8C; --a:#0FA294; --g:#E0A526; --t:#1F2937; --m:#6B7280; --l:#E5E9F0; }
+* { box-sizing:border-box; } body { margin:0; font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif; color:var(--t); background:#F2F5FA; }
+.hero { background:linear-gradient(135deg,#0F2747,#1E4D8C 55%,#0FA294); color:#fff; padding:48px 20px; }
+.wrap { max-width:1060px; margin:0 auto; } .hero .wrap { display:flex; gap:28px; align-items:center; flex-wrap:wrap; }
+.hero img { width:150px; height:150px; } h1 { margin:0 0 8px; font-size:32px; } .hero p { color:#DCE6F5; font-size:17px; line-height:1.6; margin:0 0 18px; }
+.btn { display:inline-block; border-radius:12px; padding:12px 22px; font-weight:700; text-decoration:none; margin:0 8px 8px 0; }
+.b1 { background:var(--g); color:#14325C; } .b2 { background:#fff2; color:#fff; border:1px solid #fff6; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin:26px 0; }
+.card { background:#fff; border:1px solid var(--l); border-radius:16px; padding:18px; } .card b { display:block; font-size:16px; margin:6px 0; } .card span { color:var(--m); font-size:14px; line-height:1.6; }
+.ic { font-size:30px; } h2 { margin:30px 0 10px; } table { width:100%; border-collapse:collapse; background:#fff; border-radius:12px; overflow:hidden; }
+td,th { padding:10px 12px; border-bottom:1px solid var(--l); text-align:left; font-size:14px; } th { background:#F7F9FC; }
+footer { color:var(--m); font-size:13px; text-align:center; padding:30px 10px; }
+.voice { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="hero"><div class="wrap"><img src="icon.png" alt="資料助秘3D列印AI代理人工具圖示"><div style="flex:1;min-width:260px">
+  <h1>資料助秘3D列印AI代理人工具</h1>
+  <p>從一句描述到可以在拓竹（Bambu Lab）印表機列印的零件：<br><b>描述 → 零件 → 七項列印前檢查 → Bambu Studio</b>。列印永遠由您自己按。</p>
+  <a class="btn b1" href="app/">開始使用線上版</a><a class="btn b2" href="https://github.com/achir1015/zms-print-agent/releases/latest">下載電腦版（Windows／macOS）</a>
+  <div class="voice"><button class="btn b2" id="intro" style="border:1px solid #fff6;cursor:pointer;font:inherit;font-weight:700">🔊 聽語音介紹</button><a class="btn b2" href="app/#help">語音動態教學</a></div>
+</div></div></div>
+<div class="wrap" style="padding:0 16px">
+  <div class="grid">
+    <div class="card"><div class="ic">🤖</div><b>AI 代理人</b><span>「設計一個 60×40×30 毫米、帶蓋的電子元件盒」——代理人挑零件、填尺寸、檢查；接著說「壁厚改成 2.4」「縮放到 12 公分高」就能修改。免費本機規則，或填自己的 Claude 金鑰。</span></div>
+    <div class="card"><div class="ic">📐</div><b>18 種參數化零件</b><span>收納盒、電子元件盒、支架、掛鉤、理線夾、手機架、Gridfinity、花瓶、花盆、旋鈕、管接頭、齒輪…拖曳滑桿即時重建，保證封閉、照列印方向設計。</span></div>
+    <div class="card"><div class="ic">🩺</div><b>七項列印前檢查</b><span>網格完整、列印範圍（13 種拓竹機型）、懸空、懸垂、壁厚、底面接觸、材料，滿分 10 分並給建議的層高、填充與溫度。</span></div>
+    <div class="card"><div class="ic">🔄</div><b>Bambu 3MF → GLB</b><span>解碼 Bambu Studio 的上色筆刷，多色專案轉成每種耗材一個材質的 GLB，Blender、Unity、網頁都能開。</span></div>
+    <div class="card"><div class="ic">📚</div><b>設計庫</b><span>每次儲存一版，附 3MF 與 SHA-256；可以核准凍結、匯出匯入。線上版存在這台裝置的瀏覽器裡。</span></div>
+    <div class="card"><div class="ic">🔊</div><b>語音動態教學</b><span>8 課語音教學，步驟會隨著講解亮起來，每一步都可以「跟著做」。</span></div>
+  </div>
+  <h2>線上版與電腦版</h2>
+  <table><tr><th>功能</th><th>線上版</th><th>電腦版（Windows／macOS）</th></tr>
+    <tr><td>AI 代理人、零件設計、七項檢查、3MF → GLB、匯出 3MF／STL／GLB／OBJ</td><td>✔</td><td>✔</td></tr>
+    <tr><td>一鍵開啟 Bambu Studio、用 Bambu Studio 引擎估算時間與克數</td><td>下載 3MF 自己開</td><td>✔</td></tr>
+    <tr><td>MakerWorld／Printables 搜尋</td><td>開啟網站搜尋頁</td><td>直接列出結果與下載數</td></tr>
+    <tr><td>印表機狀態（區網唯讀）、AI 文字／照片轉 3D、彩色模型轉 AMS 多色</td><td>—</td><td>✔</td></tr>
+    <tr><td>資料庫、使用者權限、備份還原</td><td>瀏覽器內</td><td>內建 MariaDB</td></tr></table>
+</div>
+<footer>v<span id="v"></span> · 系統開發：吳玉柱 先生 與 Claude AI Opus 5.5 · <a href="https://github.com/achir1015/zms-print-agent">GitHub</a>（AGPL-3.0）</footer>
+<script type="module">
+import { DATA } from "./app/data.js";
+document.getElementById("v").textContent = DATA.version;
+const a = new Audio("voice/intro.mp3");
+document.getElementById("intro").onclick = () => a.paused ? a.play() : a.pause();
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+</script>
+</body>
+</html>

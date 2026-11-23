@@ -38,7 +38,12 @@ https://github.com/user-attachments/assets/a085edc1-5482-49eb-bbe7-21e5db55cf38
 |---|---|
 | Windows 11 | [ZMSPrintAgent-Setup-1.0.0.exe](https://github.com/achir1015/zms-print-agent/releases/latest) |
 | macOS 11 以上（Intel／Apple 晶片，已公證） | [ZMSPrintAgent-1.0.0-mac.dmg](https://github.com/achir1015/zms-print-agent/releases/latest)（打開後把 App 拖到「應用程式」） |
-| 線上版、iPhone／iPad、Android | 開發中 |
+| 線上版（電腦、手機、平板的瀏覽器，免安裝） | https://achir1015.github.io/zms-print-agent/ |
+| iPhone／iPad、Android | 開發中 |
+
+線上版：AI 代理人（本機規則或自己的 Claude 金鑰，瀏覽器直接呼叫）、18 種零件（manifold-3d wasm）、七項檢查、
+3MF → GLB、匯出 3MF／STL／GLB／OBJ、設計庫（存在瀏覽器 IndexedDB）、語音教學；不能連 Bambu Studio、印表機、切片，
+搜尋改成開啟 MakerWorld／Printables 的搜尋頁。
 
 ## 開發
 
@@ -47,7 +52,11 @@ https://github.com/user-attachments/assets/a085edc1-5482-49eb-bbe7-21e5db55cf38
 .venv\Scripts\python run_web.py            # 網頁預覽 http://127.0.0.1:8670（自動登入 admin）
 .venv\Scripts\python tools\demo_data.py --reset
 .venv\Scripts\python tools\build_windows.py # 安裝檔 → dist-installer\
+.venv\Scripts\python tools\make_pages.py --libs  # 線上版資料（data.js、語音、three.js、manifold wasm）
 ```
+
+- 線上版的零件與檢查在 `docs/app/engine.js`、`checks.js`（JavaScript 移植），改 `pa/recipes.py` 要一起改；
+  `tests/test_web_parity.py` 用 Node 比對兩邊的體積、尺寸與檢查結果。改線上版程式要遞增 `docs/sw.js` 的 `CACHE`。
 
 - `pa/recipes.py` 參數化零件、`pa/mesh3d.py` 讀寫、`pa/render.py` 預覽繪圖、`pa/checks.py` 檢查、
   `pa/agent.py` 代理人、`pa/tools3d.py` Bambu Studio／印表機／搜尋／AI 生成、`pa/designbiz.py` 設計庫。

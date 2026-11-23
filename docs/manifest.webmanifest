@@ -1,0 +1,11 @@
+{
+  "name": "資料助秘3D列印AI代理人工具",
+  "short_name": "3D列印AI代理人",
+  "start_url": "app/",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0F2747",
+  "theme_color": "#0F2747",
+  "lang": "zh-Hant-TW",
+  "icons": [{ "src": "icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" }]
+}
