@@ -2,6 +2,11 @@
 <img width="1134" height="707" alt="image" src="https://github.com/user-attachments/assets/cd98c571-d249-44a0-a532-62adc8e0aa04" />
 
 <img src="assets/icon.png" width="128" align="right" alt="資料助秘3D列印AI代理人工具圖示">
+說明
+
+
+https://github.com/user-attachments/assets/a085edc1-5482-49eb-bbe7-21e5db55cf38
+
 
 從一句描述到可以在拓竹（Bambu Lab）印表機列印的零件：**描述 → 零件 → 七項列印前檢查 → Bambu Studio**。
 列印永遠由您自己在 Bambu Studio 按下；代理人只負責設計、檢查、估算與開啟檔案。
