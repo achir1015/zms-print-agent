@@ -37,7 +37,8 @@ https://github.com/user-attachments/assets/a085edc1-5482-49eb-bbe7-21e5db55cf38
 | 平台 | 檔案 |
 |---|---|
 | Windows 11 | [ZMSPrintAgent-Setup-1.0.0.exe](https://github.com/achir1015/zms-print-agent/releases/latest) |
-| macOS、線上版、iPhone／iPad、Android | 開發中 |
+| macOS 11 以上（Intel／Apple 晶片，已公證） | [ZMSPrintAgent-1.0.0-mac.dmg](https://github.com/achir1015/zms-print-agent/releases/latest)（打開後把 App 拖到「應用程式」） |
+| 線上版、iPhone／iPad、Android | 開發中 |
 
 ## 開發
 
