@@ -39,7 +39,8 @@ https://github.com/user-attachments/assets/a085edc1-5482-49eb-bbe7-21e5db55cf38
 | Windows 11 | [ZMSPrintAgent-Setup-1.0.0.exe](https://github.com/achir1015/zms-print-agent/releases/latest) |
 | macOS 11 以上（Intel／Apple 晶片，已公證） | [ZMSPrintAgent-1.0.0-mac.dmg](https://github.com/achir1015/zms-print-agent/releases/latest)（打開後把 App 拖到「應用程式」） |
 | 線上版（電腦、手機、平板的瀏覽器，免安裝） | https://achir1015.github.io/zms-print-agent/ |
-| iPhone／iPad、Android | 開發中 |
+| iPhone／iPad（iOS 17 以上） | [線上安裝頁](https://achir1015.github.io/zms-print-agent/ios/)（用 Safari 開；限登記過的裝置；App 內可檢查更新） |
+| Android | 開發中 |
 
 線上版：AI 代理人（本機規則或自己的 Claude 金鑰，瀏覽器直接呼叫）、18 種零件（manifold-3d wasm）、七項檢查、
 3MF → GLB、匯出 3MF／STL／GLB／OBJ、設計庫（存在瀏覽器 IndexedDB）、語音教學；不能連 Bambu Studio、印表機、切片，
