@@ -517,25 +517,41 @@ $("#menuBtn").onclick = () => $("#side").classList.toggle("open");
 $("#ver").textContent = "v" + DATA.version;
 // iPhone／iPad、Android App：顯示 App 版本，查 GitHub 最新版，有新版就在上方顯示「有新版」
 const newer = (a, b) => { const x = a.split(".").map(Number), y = b.split(".").map(Number); for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); return false; };
+const APPVER = IOS ? IOS.version : AND ? (AND.getVersion ? AND.getVersion() : "0") : "";
+let updAsset = null;
 async function checkUpdate(manual) {
-  const app = IOS || AND; if (!app) return;
-  const asset = IOS ? "ZMSPrintAgent-ios.ipa" : "android.apk";
+  if (!IOS && !AND) return;
+  const suffix = IOS ? "ZMSPrintAgent-ios.ipa" : "-android.apk";
   try {
     const r = await fetch(`https://api.github.com/repos/${DATA.repo}/releases/latest`), j = await r.json();
-    const latest = (j.tag_name || "").replace(/^v/, ""), has = (j.assets || []).some((a) => a.name.endsWith(asset));
-    if (latest && has && newer(latest, app.version)) {
+    const latest = (j.tag_name || "").replace(/^v/, ""), asset = (j.assets || []).find((x) => x.name.endsWith(suffix));
+    if (latest && asset && newer(latest, APPVER)) {
+      updAsset = { url: asset.browser_download_url, ver: latest };
       $("#upd").textContent = `⬆ 有新版 v${latest}`; $("#upd").classList.add("show");
       if (manual) $("#upd").click();
-    } else if (manual) toast("已經是最新版 v" + app.version);
+    } else if (manual) toast("已經是最新版 v" + APPVER);
   } catch (e) { if (manual) toast("檢查更新需要網路", true); }
 }
 if (IOS || AND) {
   document.documentElement.classList.add(IOS ? "ios-app" : "android-app", "ios-app");
-  $("#edition").textContent = IOS ? "iPhone／iPad 版" : "Android 版"; $("#ver").textContent = "v" + (IOS || AND).version;
-  $("#upd").onclick = () => { if (IOS) location.href = `https://achir1015.github.io/zms-print-agent/ios/`; else AND.installUpdate && AND.installUpdate(); };
+  $("#edition").textContent = IOS ? "iPhone／iPad 版" : "Android 版"; $("#ver").textContent = "v" + APPVER;
+  $("#upd").onclick = () => {
+    if (IOS) { location.href = "https://achir1015.github.io/zms-print-agent/ios/"; return; }
+    if (updAsset && confirm(`下載並安裝新版 v${updAsset.ver}（目前 v${APPVER}）？
+設計庫與設定都會保留。`)) {
+      const r = JSON.parse(AND.installUpdate(updAsset.url, updAsset.ver));
+      toast(r.status === "ok" ? "開始下載新版，完成後會跳出安裝畫面（第一次要允許「安裝未知應用程式」）" : "更新失敗：" + r.message, r.status !== "ok");
+    }
+  };
   $("#chkUpd").style.display = ""; $("#chkUpd").onclick = () => checkUpdate(true);
   setTimeout(() => checkUpdate(false), 2000);
 }
+// Android 返回鍵：不在首頁就回首頁（回傳 true＝已處理）
+window.__zmsBack = () => {
+  if ($("#side").classList.contains("open")) { $("#side").classList.remove("open"); return true; }
+  if (current !== "home") { location.hash = "home"; return true; }
+  return false;
+};
 (async () => {
   try { await initEngine(); }
   catch (e) { $("#loading p").textContent = "建模引擎載入失敗（瀏覽器需要支援 WebAssembly）：" + e.message; return; }
