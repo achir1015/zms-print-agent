@@ -1,4 +1,5 @@
 # 資料助秘3D列印AI代理人工具
+<img width="1134" height="707" alt="image" src="https://github.com/user-attachments/assets/cd98c571-d249-44a0-a532-62adc8e0aa04" />
 
 <img src="assets/icon.png" width="128" align="right" alt="資料助秘3D列印AI代理人工具圖示">
 
