@@ -25,8 +25,15 @@ iconutil -c icns "$SET" -o build-mac/icon.icns
 
 echo "== flet pack"
 .venv/bin/flet pack main.py -y -n ZMSPrintAgent -i build-mac/icon.icns --distpath dist-mac \
-  --add-data assets:assets \
+  --add-data assets:assets --add-data vendor:vendor \
   --hidden-import edge_tts --hidden-import pymysql --hidden-import certifi --hidden-import qrcode \
+  --hidden-import paho.mqtt.client --hidden-import requests --hidden-import scipy.spatial --hidden-import scipy.sparse \
+  --hidden-import scipy.sparse.csgraph --hidden-import scipy.ndimage --hidden-import scipy.cluster.vq \
+  --hidden-import networkx --hidden-import lxml.etree --hidden-import PIL.ImageDraw --hidden-import manifold3d \
+  --hidden-import anthropic --hidden-import rtree --hidden-import trimesh.exchange.threemf \
+  --hidden-import trimesh.exchange.gltf \
+  --pyinstaller-build-args=--collect-all=trimesh --pyinstaller-build-args=--collect-all=manifold3d \
+  --pyinstaller-build-args=--collect-submodules=paho --pyinstaller-build-args=--collect-submodules=networkx \
   --pyinstaller-build-args=--collect-all=flet_web --pyinstaller-build-args=--collect-all=flet_audio \
   --pyinstaller-build-args=--collect-submodules=uvicorn \
   --product-name "$NAME" --product-version "$VER" --bundle-id "$BUNDLE_ID" --copyright "© 2026 吳玉柱"
@@ -46,7 +53,7 @@ pb "Delete :LSMinimumSystemVersion"; pb "Add :LSMinimumSystemVersion string 11.0
 pb "Delete :LSApplicationCategoryType"; pb "Add :LSApplicationCategoryType string public.app-category.productivity"
 pb "Delete :NSHumanReadableCopyright"; pb "Add :NSHumanReadableCopyright string 系統開發：吳玉柱 先生 與 Claude AI Opus 5.5"
 pb "Delete :NSLocalNetworkUsageDescription"
-pb "Add :NSLocalNetworkUsageDescription string 連到公司區域網路上的 MariaDB 計算尺資料庫"
+pb "Add :NSLocalNetworkUsageDescription string 讀取區域網路上拓竹印表機的狀態、連到公司的 MariaDB 資料庫"
 pb "Delete :NSAppleEventsUsageDescription"
 pb "Add :NSAppleEventsUsageDescription string 在桌面建立本系統的替身"
 

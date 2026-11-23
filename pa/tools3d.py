@@ -104,8 +104,9 @@ def open_in_bambu(path, custom=""):
     if not exe:
         raise ToolError("找不到 Bambu Studio，請先安裝（bambulab.com/zh-tw/download/studio），或在「AI 與印表機設定」指定路徑")
     kw = {"stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
-    if sys.platform == "darwin" and exe.endswith(".app"):
-        subprocess.Popen(["open", "-a", exe, path], **kw)
+    if sys.platform == "darwin" and ".app" in exe:
+        app = exe[:exe.index(".app") + 4]          # 用 open -a 交給已開啟的 Bambu Studio，不另開新實例
+        subprocess.Popen(["open", "-a", app, path], **kw)
     else:
         if os.name == "nt":
             kw["creationflags"] = 0x00000008       # DETACHED_PROCESS：關掉本程式也不影響 Bambu Studio
