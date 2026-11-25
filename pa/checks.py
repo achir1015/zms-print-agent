@@ -3,6 +3,8 @@
 七項：網格完整、列印範圍、懸空零件、懸垂、壁厚、底面接觸、材料適用；滿分 10 分。
 """
 import math
+
+import numpy as np
 import threading
 
 from . import mesh3d, vend
@@ -157,6 +159,20 @@ def check(model, printer="A1", material="PLA", purpose="general", quick=True):
         st, tone = STATUS.get(r.status, (r.status, "slate"))
         items.append({"id": cid, "name": CHECK_NAMES.get(cid, cid), "status": r.status, "status_zh": st, "tone": tone,
                       "text": _zh(cid, r, printer, mp.name), "en": r.summary})
+    score_value = float(a.score.value)
+    # 多個零件（例如左右兩半殼）合起來放不下、但每個零件單獨放得下 → 分到兩個列印盤即可，不算不合格
+    fit = next((i for i in items if i["id"] == "build_volume"), None)
+    if fit and fit["status"] == "fail" and len(model.parts) > 1 and pp is not None:
+        from bambu_studio_ai.mesh.checks import check_fit
+        if all(check_fit(np.asarray(p.mesh.extents, dtype=np.float64), pp).fits for p in model.parts):
+            fit.update(status="warn", status_zh=STATUS["warn"][0], tone=STATUS["warn"][1],
+                       text="全部 %d 個零件合起來超出 %s 的列印板，但每個零件單獨都放得進：在 Bambu Studio 按「自動擺放」"
+                            "分到不同列印盤即可。" % (len(model.parts), printer))
+            score_value = 10 + sum(d.points for d in a.score.deductions)
+            for cap in a.score.caps:
+                if cap.applied and cap.check != "build_volume":
+                    score_value = min(score_value, cap.limit)
+            score_value = round(max(0.0, score_value), 1)
     g = a.geometry
     sugg = []
     for s in a.suggestions:
@@ -169,7 +185,7 @@ def check(model, printer="A1", material="PLA", purpose="general", quick=True):
         else:
             sugg.append(s)
     return {
-        "score": float(a.score.value),
+        "score": score_value,
         "printer": printer, "material": mp.name, "purpose": purpose,
         "size": [round(float(x), 2) for x in g.dimensions_mm],
         "volume_cm3": None if g.volume_cm3 is None else round(float(g.volume_cm3), 2),

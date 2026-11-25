@@ -33,6 +33,7 @@ def menu():
             ("design", "零件設計", I.ARCHITECTURE, "DESIGN", 1),
             ("library", "設計庫", I.COLLECTIONS_BOOKMARK, "DESIGN", 1)]),
         ("模型工具", I.BUILD_CIRCLE, "teal", [
+            ("regions", "匯入與分區編輯", I.DASHBOARD_CUSTOMIZE, "TOOL", 1),
             ("check", "檢查與修復", I.FACT_CHECK, "TOOL", 1),
             ("convert", "格式轉換（3MF↔GLB）", I.SYNC_ALT, "TOOL", 1),
             ("search", "搜尋現成模型", I.TRAVEL_EXPLORE, "TOOL", 1),
@@ -51,11 +52,11 @@ def menu():
 
 def build_screen(sid, ctx, **kw):
     from . import (admin, agentview, dashboard, designview, helpview, libraryview, printerview,
-                   toolsview)
+                   regionview, toolsview)
     table = {
         "home": dashboard.Dashboard, "agent": agentview.AgentScreen, "design": designview.DesignScreen,
         "library": libraryview.Library, "check": toolsview.CheckScreen, "convert": toolsview.ConvertScreen,
-        "search": toolsview.SearchScreen, "aigen": toolsview.AIGenScreen, "printers": printerview.Printers,
+        "search": toolsview.SearchScreen, "regions": regionview.RegionScreen, "aigen": toolsview.AIGenScreen, "printers": printerview.Printers,
         "aiset": printerview.AISettings, "users": admin.Users, "backup": admin.Backup, "update": admin.Update,
         "audit": admin.Audit, "help": helpview.Help,
     }

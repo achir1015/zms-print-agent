@@ -449,6 +449,173 @@ def build_desk_hook(v):
     return [("桌下掛鉤", m)]
 
 
+def _tube_y(d, length, y0, z=0.0, d2=None, x=0.0):
+    """沿 -Y 方向的圓柱：從 y0 往前（-Y）長 length。"""
+    m = Manifold.cylinder(length, d / 2, (d2 if d2 is not None else d) / 2, circular_segments=SEG)
+    return m.rotate((90, 0, 0)).translate((x, y0, z))
+
+
+def _bar_y(w, h, length, r, yc, zc=0.0):
+    """XZ 截面圓角矩形、沿 Y 方向、中心在 (0, yc, zc)。"""
+    return rrect(w, h, r).extrude(length).rotate((90, 0, 0)).translate((0, yc + length / 2, zc))
+
+
+def _boss_x(width, y, z, d=6.0):
+    """沿 X 方向橫跨內腔的螺絲柱（切成兩半後兩邊各一段）。"""
+    return Manifold.cylinder(width, d / 2, d / 2, circular_segments=48).rotate((0, 90, 0)).translate((-width / 2, y, z))
+
+
+def _screw_holes(shell_w, y, z, sd):
+    """合殼螺絲：右半殼自攻導孔，左半殼通孔＋外側沉頭。"""
+    pilot = Manifold.cylinder(shell_w + 4, sd * 0.42, sd * 0.42, circular_segments=32).rotate((0, 90, 0)).translate((-shell_w / 2 - 2, y, z))
+    clear = Manifold.cylinder(shell_w / 2 + 2, sd / 2 + 0.2, sd / 2 + 0.2, circular_segments=32).rotate((0, 90, 0)).translate((-shell_w / 2 - 2, y, z))
+    head = Manifold.cylinder(2.2, sd + 0.4, sd + 0.4, circular_segments=32).rotate((0, 90, 0)).translate((-shell_w / 2 - 0.2, y, z))
+    return pilot + clear + head
+
+
+def build_thermo_gun(v):
+    """額溫槍外殼：槍型（槍頭＋握把）或直棒型；內含 ESP32-S3 開發板導軌、電池槽、紅外線感測器座、OLED 螢幕框、
+    扳機按鍵孔、USB-C 開口、合殼螺絲柱；沿中線切成左右兩半殼，外側平面朝下平放列印。
+    座標：鼻頭（感測器）朝 -Y、螢幕在 +Y（槍型）或上方（直棒型）。"""
+    t, r = v["wall"], v["corner"]
+    W, H = v["head_w"], v["head_h"]
+    stick = int(v["style"]) == 2
+    need = t * 2 + 22 + v["battery_l"] + 6 + v["board_l"] + 8
+    L = max(v["head_l"], need) if stick else v["head_l"]
+    adds, subs = [], []
+    # ---------------------------------------------------------------- 外形與內腔
+    outer = _bar_y(W, H, L, r, 0)
+    inner = _bar_y(W - 2 * t, H - 2 * t, L - 2 * t, max(r - t, 0.8), 0)
+    nz = -H * 0.05                                    # 鼻頭（感測器）高度
+    nose = _tube_y(v["nose_d"], v["nose_l"] + 4, -L / 2 + 4, nz, d2=v["nose_d"] * 0.86)
+    outer = outer + nose
+    # 感測器座：MLX90614（TO-39 金屬罐）放在鼻頭內孔，前端留 1.5 mm 擋邊與量測孔
+    subs.append(_tube_y(v["sensor_d"] + 0.4, v["nose_l"] + 4 - 1.5, -L / 2 + 4, nz))
+    subs.append(_tube_y(max(v["sensor_d"] - 2, 3), 6, -L / 2 - v["nose_l"] + 3, nz))
+    yb = -L / 2 + t + 22 + v["battery_l"] / 2        # 電池中心：感測器後方
+    screws = []
+    hl, hW, hD, ang = v["handle_l"], v["handle_w"], v["handle_d"], v["handle_angle"]
+    ya, za = L / 2 - hD / 2 - 10, -H / 2 + 4
+
+    def place(m):                                     # 握把座標 → 世界座標（後傾 ang 度，接在槍頭底部偏後）
+        return m.rotate((ang, 0, 0)).translate((0, ya, za))
+    if not stick:
+        hr = min(r, hW / 2 - 1, hD / 2 - 1)
+        outer = outer + place(rrect(hW, hD, hr).extrude(hl + 4).translate((0, 0, -hl)))
+        inner = inner + place(rrect(hW - 2 * t, hD - 2 * t, max(hr - t, 0.8)).extrude(hl + H / 2 + 4 - t).translate((0, 0, -hl + t)))
+        # 開發板：握把內直立、元件面朝後、USB-C 朝下；兩側各一對導軌夾住板邊
+        yb0 = -hD / 2 + t + v["board_under"] + v["board_t"] / 2
+        zb0 = -hl + t + 0.5
+        x_in, x_tip = hW / 2 - t, v["board_w"] / 2 - 1.5
+        for sx in (-1, 1):
+            for dy in (-1, 1):
+                y = yb0 + dy * (v["board_t"] / 2 + 0.25 + 0.6)
+                rib = Manifold.cube((x_in - x_tip + 0.5, 1.2, v["board_l"]), False).translate(
+                    (x_tip if sx > 0 else -x_in - 0.5, y - 0.6, zb0))
+                adds.append(place(rib))
+        if v["usb"]:
+            subs.append(place(Manifold.cube((v["usb_w"], v["usb_h"], t * 4 + 2), True).translate(
+                (0, yb0 + v["board_t"] / 2 + 1.6, -hl))))
+        subs.append(place(_tube_y(v["button_d"], t * 4, -hD / 2 + t * 2, -18)))          # 扳機按鍵
+        adds.append(place(_boss_x(hW - 2 * t, hD / 2 - t - 5, -hl + 12)))               # 握把底部螺絲柱
+        screws.append(place(_screw_holes(hW, hD / 2 - t - 5, -hl + 12, v["screw_d"])))
+    else:
+        inner = inner - nose
+        y_board = yb + v["battery_l"] / 2 + 6 + v["board_l"] / 2
+        zb = -H / 2 + t + v["board_under"] + v["board_t"] / 2
+        x_in, x_tip = W / 2 - t, v["board_w"] / 2 - 1.5
+        for sx in (-1, 1):
+            for dz in (-1, 1):
+                z = zb + dz * (v["board_t"] / 2 + 0.25 + 0.6)
+                adds.append(Manifold.cube((x_in - x_tip + 0.5, v["board_l"], 1.2), False).translate(
+                    (x_tip if sx > 0 else -x_in - 0.5, y_board - v["board_l"] / 2, z - 0.6)))
+        if v["usb"]:
+            subs.append(Manifold.cube((v["usb_w"], t * 4 + 2, v["usb_h"]), True).translate((0, L / 2, zb + v["board_t"] / 2 + 1.6)))
+        subs.append(Manifold.cylinder(t * 4, v["button_d"] / 2, v["button_d"] / 2, circular_segments=SEG).translate(
+            (0, -L / 2 + 30, H / 2 - t * 2)))
+    # 電池槽：前後兩道擋牆（高 5 mm）
+    for dy in (-1, 1):
+        adds.append(Manifold.cube((W - 2 * t + 0.2, 1.6, 5), False).translate(
+            (-(W - 2 * t + 0.2) / 2, yb + dy * (v["battery_l"] / 2 + 0.8) - 0.8, -H / 2 + t - 0.1)))
+    # OLED 螢幕窗＋四個 M2 固定柱：槍型在背面、直棒型在上面
+    ow, oh = v["oled_w"] / 2 - 2.5, v["oled_h"] / 2 - 2.5
+    if not stick:
+        zc = H * 0.12
+        subs.append(Manifold.cube((v["win_w"], t * 4, v["win_h"]), True).translate((0, L / 2 - t / 2, zc)))
+        for sx in (-1, 1):
+            for sz in (-1, 1):
+                adds.append(_tube_y(4.5, 3.5, L / 2 - t + 0.01, zc + sz * oh, x=sx * ow))
+                subs.append(_tube_y(1.8, 5, L / 2 - t + 0.01, zc + sz * oh, x=sx * ow))
+    else:
+        yc = -L / 2 + 45
+        subs.append(Manifold.cube((v["win_w"], v["win_h"], t * 4), True).translate((0, yc, H / 2 - t / 2)))
+        for sx in (-1, 1):
+            for sy in (-1, 1):
+                adds.append(Manifold.cylinder(3.5, 2.25, 2.25, circular_segments=32).translate(
+                    (sx * ow, yc + sy * oh, H / 2 - t - 3.5 + 0.01)))
+                subs.append(Manifold.cylinder(5, 0.9, 0.9, circular_segments=24).translate((sx * ow, yc + sy * oh, H / 2 - t - 4.5)))
+    # 槍頭合殼螺絲柱：前上、後上（直棒型的後端放下方，避開螢幕）
+    zt = H / 2 - t - 5
+    for y, z in ((-L / 2 + 14, zt), (L / 2 - 12, zt if not stick else -H / 2 + t + 5)):
+        adds.append(_boss_x(W - 2 * t, y, z))
+        screws.append(_screw_holes(W, y, z, v["screw_d"]))
+    shell = outer - inner
+    for f in adds:
+        shell = shell + (f ^ outer)
+    for f in subs + screws:
+        shell = shell - f
+    lo, hi = bbox(shell)
+    shell = shell.translate((0, 0, -lo[2]))
+    if not v["split"]:
+        return [("額溫槍外殼（組合）", shell)]
+    lo, hi = bbox(shell)
+    big = float(max(hi - lo)) * 3
+    right = shell ^ Manifold.cube((big, big, big), False).translate((0, -big / 2, -big / 2))
+    left = shell ^ Manifold.cube((big, big, big), False).translate((-big, -big / 2, -big / 2))
+    # 外側平面朝下、開口朝上平放（最好印，懸垂只有圓角）：左半殼繞 Y 轉 -90°、右半殼 +90°
+    halves = [("左半殼", left.rotate((0, -90, 0))), ("右半殼", right.rotate((0, 90, 0)))]
+    if v["style"] == 1:
+        nested = nest_pair(halves[0][1], halves[1][1], gap=5)
+        if nested:
+            return [(halves[0][0], nested[0]), (halves[1][0], nested[1])]
+    return place_side_by_side(halves, gap=10)
+
+
+def nest_pair(a, b, gap=5.0, step=3.0):
+    """兩個 L 形零件：b 轉 180° 和 a 互相嵌合，找最小的正方形範圍（同一個列印盤放得下兩塊）。找不到比並排小的就回傳 None。"""
+    b = b.rotate((0, 0, 180))
+    pa_, pb = a.project(), b.project().offset(gap / 2)
+    pa_ = pa_.offset(gap / 2)
+    (ax0, ay0), (ax1, ay1) = _cs_box(pa_)
+    (bx0, by0), (bx1, by1) = _cs_box(pb)
+    side = max(ax1 - ax0 + bx1 - bx0, max(ay1 - ay0, by1 - by0))      # 並排的寬度
+    cands = []
+    nx = int((ax1 - ax0 + bx1 - bx0) / step) + 1
+    ny = int((ay1 - ay0 + by1 - by0) / step) + 1
+    for i in range(nx + 1):
+        for j in range(ny + 1):
+            dx = ax0 - bx1 + i * step
+            dy = ay0 - by1 + j * step
+            w = max(ax1, bx1 + dx) - min(ax0, bx0 + dx)
+            d = max(ay1, by1 + dy) - min(ay0, by0 + dy)
+            if max(w, d) < side - 1:
+                cands.append((max(w, d), w + d, dx, dy))
+    cands.sort()
+    for _, _, dx, dy in cands:
+        if (pa_ ^ pb.translate((dx, dy))).area() < 0.5:
+            b2 = b.translate((dx, dy, 0))
+            lo = [min(x, y) for x, y in zip(bbox(a)[0], bbox(b2)[0])]
+            hi = [max(x, y) for x, y in zip(bbox(a)[1], bbox(b2)[1])]
+            c = (-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, 0)
+            return a.translate(c).translate((0, 0, -bbox(a)[0][2])), b2.translate(c).translate((0, 0, -bbox(b2)[0][2]))
+    return None
+
+
+def _cs_box(cs):
+    r = cs.bounds()
+    return (r[0], r[1]), (r[2], r[3])
+
+
 P = Param
 RECIPES = [
     Recipe("storage_box", "帶蓋收納盒", "收納", "INVENTORY_2", "盒身＋壓入式盒蓋，指定外部尺寸與壁厚。", [
@@ -468,6 +635,33 @@ RECIPES = [
         P("cable_d", "側邊線孔直徑（0＝不開）", 6, 0, 20, 0.5),
         P("vents", "散熱孔", True, 0, 1, 1, "", kind="bool")],
         build_enclosure, ("電子", "元件", "外殼", "電路", "enclosure", "pcb", "arduino", "樹莓派")),
+    Recipe("thermo_gun", "額溫槍外殼", "外殼", "THERMOSTAT",
+           "槍型或直棒型額溫槍外殼：GOOUUU ESP32-S3（42 pin）開發板導軌、鋰電池槽、MLX90614 紅外線感測器座、"
+           "0.96 吋 OLED 螢幕框、扳機按鍵孔、USB-C 開口、M2 合殼螺絲柱；切成左右兩半殼平放列印。", [
+               P("style", "外形（1 槍型、2 直棒型）", 1, 1, 2, 1, "", kind="int", doc="直棒型會自動加長到放得下電池與開發板"),
+               P("head_l", "槍頭（機身）長度", 120, 80, 220, 1), P("head_w", "槍頭寬度", 40, 30, 70, 0.5),
+               P("head_h", "槍頭高度", 46, 30, 80, 0.5), P("corner", "外形圓角", 10, 2, 25, 0.5),
+               P("nose_d", "鼻頭直徑", 26, 16, 40, 0.5), P("nose_l", "鼻頭長度", 14, 5, 40, 0.5),
+               P("handle_l", "握把長度", 95, 70, 140, 1, doc="要放得下開發板長度＋約 20 mm"),
+               P("handle_w", "握把寬度（左右）", 34, 30, 50, 0.5, doc="內寬要比開發板寬 2 mm 以上"),
+               P("handle_d", "握把厚度（前後）", 36, 26, 60, 0.5),
+               P("handle_angle", "握把後傾角度", 15, 0, 35, 1, "°"),
+               P("wall", "壁厚", 2.0, 1.2, 4, 0.2),
+               P("board_l", "開發板長度", 63.5, 40, 90, 0.1, doc="GOOUUU ESP32-S3 42 pin 約 63.5 mm，請用卡尺量"),
+               P("board_w", "開發板寬度", 28, 18, 40, 0.1, doc="約 28 mm（含排針）"),
+               P("board_t", "開發板厚度", 1.6, 0.8, 2.4, 0.1),
+               P("board_under", "板子背面空間", 3, 0, 12, 0.5, doc="背面有排針或元件時加大"),
+               P("usb", "USB-C 開口", True, 0, 1, 1, "", kind="bool"),
+               P("usb_w", "USB-C 開口寬", 10, 8, 16, 0.5), P("usb_h", "USB-C 開口高", 4.5, 3, 8, 0.5),
+               P("battery_l", "電池長度", 50, 20, 80, 0.5, doc="503450 鋰電池 50×34×5 mm"),
+               P("battery_w", "電池寬度", 34, 15, 60, 0.5), P("battery_t", "電池厚度", 6, 3, 20, 0.5),
+               P("sensor_d", "紅外線感測器直徑", 9.5, 6, 20, 0.1, doc="MLX90614 金屬罐約 9.2 mm"),
+               P("oled_w", "OLED 模組寬", 27, 15, 45, 0.5), P("oled_h", "OLED 模組高", 27, 15, 45, 0.5),
+               P("win_w", "螢幕窗寬", 23, 10, 40, 0.5), P("win_h", "螢幕窗高", 12, 6, 30, 0.5),
+               P("button_d", "按鍵孔直徑", 7, 3, 14, 0.5),
+               P("screw_d", "合殼螺絲直徑", 2, 2, 3, 0.5, doc="M2 就填 2"),
+               P("split", "切成左右兩半殼（列印用）", True, 0, 1, 1, "", kind="bool", doc="關掉＝看組合後的外形")],
+           build_thermo_gun, ("額溫", "溫度計", "測溫", "體溫", "紅外線", "thermometer", "esp32", "槍")),
     Recipe("plate", "開孔平板", "基本", "GRID_ON", "平板加上排列整齊的孔，可做墊板、面板、安裝板。", [
         P("width", "寬", 80, 10, 250, 1), P("depth", "深", 50, 10, 250, 1), P("thick", "厚度", 3, 1, 20, 0.2),
         P("corner", "圓角", 3, 0, 20, 0.5), P("hole_d", "孔徑", 3.4, 0, 30, 0.1, doc="M3 螺絲通孔用 3.4"),

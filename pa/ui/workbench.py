@@ -80,6 +80,9 @@ class ModelPanel(ft.Column):
                        tooltip="用 Bambu Studio 的切片引擎估算時間與克數（約 30 秒）")] if p else []
         if b.can("DESIGN", 2):
             acts.append(T.btn("存到設計庫", I.SAVE, lambda e: self.save(), kind="outline"))
+        if b.can("TOOL", 1):
+            acts.append(T.btn("分區編輯", I.DASHBOARD_CUSTOMIZE, lambda e: self.to_regions(), kind="outline",
+                              tooltip="把這個模型分成區塊，一塊一塊修改（刪除、縮放、上色、鑽孔…）"))
         acts.append(ft.PopupMenuButton(content=T.btn("匯出", I.DOWNLOAD, None, kind="outline"), items=[
             ft.PopupMenuItem(n, on_click=lambda e, x=x: self.page.run_task(self.export, x))
             for x, n in ((".3mf", "3MF（Bambu Studio）"), (".stl", "STL"), (".glb", "GLB（Windows 3D 檢視器、Blender、網頁）"),
@@ -95,6 +98,11 @@ class ModelPanel(ft.Column):
     # ------------------------------------------------------------------ 模型
     def set_model(self, model, title="", recipe=None, kind=None, src_path=None, report=None, keep_view=False):
         self.ws.set_model(model, title or self.ws.title, recipe)
+        if model is not None:
+            try:
+                self.ctx.app.last_model = (model, self.ws.title)       # 給「匯入與分區編輯」接手
+            except Exception:
+                pass
         if kind:
             self.kind = kind
         self.src_path = src_path
@@ -111,6 +119,12 @@ class ModelPanel(ft.Column):
         else:
             self.report_box.content = T.muted("尚未檢查")
             self._upd()
+
+    def to_regions(self):
+        if not self._need():
+            return
+        self.ctx.app.handoff = (self.ws.model, self._name())
+        self.ctx.app.go("regions")
 
     def _opt(self):
         self.ws.printer = self.printer.value

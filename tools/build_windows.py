@@ -43,7 +43,7 @@ def pack():
            *sum((["--hidden-import", m] for m in (
                "paho.mqtt.client", "requests", "scipy.spatial", "scipy.sparse", "scipy.sparse.csgraph", "scipy.ndimage",
                "scipy.cluster.vq", "networkx", "lxml.etree", "PIL.Image", "PIL.ImageDraw", "numpy", "manifold3d",
-               "anthropic", "rtree", "trimesh.exchange.threemf", "trimesh.exchange.gltf")), []),
+               "anthropic", "rtree", "shapely", "shapely.geometry", "trimesh.exchange.threemf", "trimesh.exchange.gltf")), []),
            "--pyinstaller-build-args=--collect-all=trimesh", "--pyinstaller-build-args=--collect-all=manifold3d",
            "--pyinstaller-build-args=--collect-submodules=paho", "--pyinstaller-build-args=--collect-submodules=networkx",
            "--pyinstaller-build-args=--collect-all=flet_web",

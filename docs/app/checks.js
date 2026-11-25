@@ -157,6 +157,13 @@ export function check(parts, printer = "A1", material = "PLA", purpose = "genera
     if (straight >= 100 || turned >= 100) {
       fits = true;
       add("build_volume", "列印範圍", straight >= 100 ? "pass" : "warn", `放得進 ${printer}（可用範圍 ${us} mm）${straight >= 100 ? "" : "，需要在板上轉 90°"}。`);
+    } else if (parts.length > 1 && parts.every((p) => {
+      // 多個零件合起來放不下、但每個零件單獨放得下 → 分到不同列印盤即可
+      const [a, b] = bounds(p.pos), s = [0, 1, 2].map((k) => b[k] - a[k]);
+      return pct(s, u) >= 100 || pct(s, [u[1], u[0], u[2]]) >= 100;
+    })) {
+      fits = "parts";
+      add("build_volume", "列印範圍", "warn", `全部 ${parts.length} 個零件合起來超出 ${printer} 的列印板，但每個零件單獨都放得進：在 Bambu Studio 按「自動擺放」分到不同列印盤即可。`);
     } else {
       fits = false;
       add("build_volume", "列印範圍", "fail", `超出 ${printer} 的可用範圍（${us} mm）；最多縮放到 ${Math.floor(Math.max(straight, turned) * 10) / 10}% 或分割模型。`);

@@ -12,7 +12,7 @@ I = ft.Icons
 
 EXAMPLES = ["設計一個尺寸為 60×40×30 毫米、帶蓋的電子元件盒", "做一個 M3 螺絲用的 L 型支架，寬 30",
             "縮放到 12 公分高，檢查是否適合我的 A1 Mini", "在 MakerWorld 幫我找好用的電線整理器",
-            "設計桌下耳機掛鉤，桌板下方要留 35 mm", "我的列印完成了嗎？還剩多久？"]
+            "設計桌下耳機掛鉤，桌板下方要留 35 mm", "設計額溫槍外殼，用 GOOUUU ESP32-S3 開發板", "我的列印完成了嗎？還剩多久？"]
 
 
 class AgentScreen(ft.Row):
@@ -57,6 +57,8 @@ class AgentScreen(ft.Row):
             self.img_chip,
             ft.Row([ft.IconButton(I.ADD_PHOTO_ALTERNATE, tooltip="附加照片或草圖（Claude 會看圖）",
                                   on_click=lambda e: self.page.run_task(self.attach), disabled=not claude),
+                    ft.IconButton(I.UPLOAD_FILE, tooltip="匯入現成模型（STL、OBJ、FBX、Maya .ma…），再請代理人分區修改",
+                                  on_click=lambda e: self.page.run_task(self.import_file)),
                     self.inp, ft.IconButton(I.SEND_ROUNDED, icon_color=ft.Colors.WHITE, bgcolor=T.PRIMARY,
                                             tooltip="送出", on_click=lambda e: self.send())],
                    vertical_alignment=ft.CrossAxisAlignment.END)], spacing=8, expand=True), padding=14, expand=5)
@@ -130,6 +132,13 @@ class AgentScreen(ft.Row):
                 pass
         self.load_history()
         T.safe_update(self)
+
+    async def import_file(self):
+        from .. import mesh3d
+        from .toolsview import pick_path
+        path = await pick_path(self.ctx, "匯入現成模型", mesh3d.OPEN_FILTER)
+        if path:
+            self.send("匯入 %s" % path)
 
     async def attach(self):
         name, data = await self.ctx.pick_bytes("選擇照片或草圖", ["png", "jpg", "jpeg", "webp"])

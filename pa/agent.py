@@ -80,13 +80,42 @@ TOOLS = [
          "prompt": {"type": "string"}, "height_mm": {"type": "number"},
          "provider": {"type": "string", "enum": ["meshy", "tripo", "rodin"]}},
          "required": ["prompt", "height_mm"], "additionalProperties": False}},
+    {"name": "import_model", "description": "匯入使用者電腦上的現成模型檔（STL、OBJ、FBX、Maya .ma、3MF、GLB、PLY），成為目前的模型。零件庫沒有、又找不到現成設計時，請使用者提供檔案路徑。",
+     "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"], "additionalProperties": False}},
+    {"name": "segment_model", "description": "把目前的模型分成幾個區塊，方便逐一修改。method：auto（預設）、groups（原檔材質）、bodies（互不相連的實體）、surface（表面轉折）、zones（空間分塊，一體成形的曲面模型）、height（由下往上分層）。回傳每個區塊的編號、名稱、尺寸與中心位置（mm）。",
+     "input_schema": {"type": "object", "properties": {
+         "method": {"type": "string", "enum": ["auto", "groups", "bodies", "surface", "zones", "height"]},
+         "target": {"type": "integer", "description": "最多幾區（2～16）"}}, "additionalProperties": False}},
+    {"name": "list_regions", "description": "列出目前模型的區塊（編號、名稱、面數、尺寸、中心、顏色）。",
+     "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}},
+    {"name": "edit_regions", "description": "修改指定區塊（regions 用編號或名稱）。op：delete 刪除、keep 只保留、move 移動（dx dy dz mm）、scale 縮放（factor 或 sx sy sz，以區塊中心為準）、rotate 旋轉（axis x/y/z、degrees）、color 指定耗材顏色（color：中文顏色或 #RRGGBB，存檔成 Bambu 多色 3MF）、uncolor、rename（name）、merge 合併。和相鄰區塊共用的邊會一起拉動。",
+     "input_schema": {"type": "object", "properties": {
+         "op": {"type": "string", "enum": ["delete", "keep", "move", "scale", "rotate", "color", "uncolor", "rename", "merge"]},
+         "regions": {"type": "array", "items": {"type": ["integer", "string"]}},
+         "dx": {"type": "number"}, "dy": {"type": "number"}, "dz": {"type": "number"},
+         "factor": {"type": "number"}, "sx": {"type": "number"}, "sy": {"type": "number"}, "sz": {"type": "number"},
+         "axis": {"type": "string", "enum": ["x", "y", "z"]}, "degrees": {"type": "number"},
+         "color": {"type": "string"}, "name": {"type": "string"}},
+         "required": ["op", "regions"], "additionalProperties": False}},
+    {"name": "cut_model", "description": "沿平面切開目前的模型（axis x/y/z，value 為座標 mm，不給就切在正中間）。keep：both（兩半並排，上半翻面，都能直接列印）、below、above。做外殼時常用來切成兩半殼。",
+     "input_schema": {"type": "object", "properties": {
+         "axis": {"type": "string", "enum": ["x", "y", "z"]}, "value": {"type": "number"},
+         "keep": {"type": "string", "enum": ["both", "below", "above"]}}, "additionalProperties": False}},
+    {"name": "add_feature", "description": "在模型上鑽孔或加凸台（需要封閉實體）。kind：hole 或 boss；位置用 at=[x,y,z] mm，或 region（在該區中心）；shape circle/box；diameter（方形用 width、height）；hole 的 depth 不給＝貫穿；boss 用 height；axis 是孔／凸台的方向。例如紅外線感測器孔、USB-C 開口、螺絲柱。",
+     "input_schema": {"type": "object", "properties": {
+         "kind": {"type": "string", "enum": ["hole", "boss"]}, "at": {"type": "array", "items": {"type": "number"}},
+         "region": {"type": ["integer", "string"]}, "shape": {"type": "string", "enum": ["circle", "box"]},
+         "diameter": {"type": "number"}, "width": {"type": "number"}, "height": {"type": "number"},
+         "depth": {"type": "number"}, "axis": {"type": "string", "enum": ["x", "y", "z"]}},
+         "required": ["kind"], "additionalProperties": False}},
 ]
 
 SYSTEM = """你是「資料助秘3D列印AI代理人」，幫使用者把想法變成可以在拓竹（Bambu Lab）印表機列印的零件。一律用繁體中文（台灣用語）回答，簡潔親切。
 
 流程：
 1. 先弄清楚：要做什麼、多大（mm）、單色或多色、材料（預設 PLA）、用途。缺什麼一次問完，不要一直追問；尺寸合理可推定時就直接做並說明假設。
-2. 選路線：精確尺寸、螺絲孔、盒子、支架、掛鉤、齒輪 → 參數化零件（make_part，免費、精確）；常見日用品（手機架、理線器、花瓶）可先 search_models 找現成設計；人物、動物、擺件 → generate_ai_model（會花錢，一定要知道高度）。
+2. 選路線：精確尺寸、螺絲孔、盒子、支架、掛鉤、齒輪、額溫槍外殼（thermo_gun，ESP32-S3 開發板、電池、紅外線感測器、OLED）→ 參數化零件（make_part，免費、精確）；常見日用品（手機架、理線器、花瓶）可先 search_models 找現成設計；人物、動物、擺件 → generate_ai_model（會花錢，一定要知道高度）。
+   零件庫沒有又找不到現成設計時，請使用者提供現成的模型檔（STL、OBJ、FBX、Maya .ma），用 import_model 匯入，再 segment_model 分區、edit_regions／cut_model／add_feature 逐區修改；每次修改後說明改了哪一區、尺寸變化。
 3. 每個模型都要檢查：make_part 會自動檢查；AI 或下載的模型先 transform_model（orient、repair、height）再 check_model。
 4. 回報分數、尺寸、重量、需要注意的地方與建議設定。
 5. 使用者滿意後才 open_in_bambu_studio，請使用者在 Bambu Studio 檢查尺寸、切片（Ctrl+R）、自己按列印。絕對不要說列印已經開始，除非 printer_status 顯示正在列印。
@@ -246,7 +275,48 @@ class Agent:
             ws.report = rep
             self.on_model(m, ws.title)
             return {"file": d["output_file"], "steps": st, **_brief(rep, m)}
+        if name in ("import_model", "segment_model", "list_regions", "edit_regions", "cut_model", "add_feature"):
+            return self._region_tool(name, a)
         raise ValueError("未知的工具：%s" % name)
+
+    def _region_tool(self, name, a):
+        from . import segment as S
+        ws = self.ws
+        if name == "import_model":
+            path = os.path.expandvars(os.path.expanduser(str(a["path"]).strip().strip('"')))
+            if not os.path.isfile(path):
+                raise ValueError("找不到檔案：%s" % path)
+            if os.path.splitext(path)[1].lower().lstrip(".") not in mesh3d.OPEN_FILTER:
+                raise ValueError("不支援的檔案格式")
+            m = mesh3d.load(path)
+            lo, hi = m.combined().bounds
+            for p in m.parts:
+                p.mesh.apply_translation([-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, -lo[2]])
+            ws.set_model(m, os.path.splitext(os.path.basename(path))[0], None)
+            ws.report = checks.check(m, ws.printer, ws.material)
+            self.on_model(m, ws.title)
+            return {"notes": m.notes, "regions": S.regions(m), **_brief(ws.report, m)}
+        self._need_model()
+        if name == "list_regions":
+            return S.regions(ws.model) or "還沒分區，請先 segment_model"
+        if name == "segment_model":
+            m = S.segment(ws.model, a.get("method") or "auto", target=a.get("target") or 8)
+            msg = "分成 %d 區" % len(S.regions(m))
+        elif name == "edit_regions":
+            kw = {k: v for k, v in a.items() if k not in ("op", "regions")}
+            m, msg = S.edit(ws.model if S.has_regions(ws.model) else S.to_single(ws.model), a["op"], a["regions"], **kw)
+        elif name == "cut_model":
+            m, msg = S.edit(S.to_single(ws.model), "cut", None, axis=a.get("axis", "z"), value=a.get("value"),
+                            keep=a.get("keep", "both"))
+        else:
+            kw = {k: v for k, v in a.items() if k not in ("kind", "region")}
+            if kw.get("depth") == 0:
+                kw["depth"] = None
+            m, msg = S.edit(S.to_single(ws.model), a["kind"], [a["region"]] if a.get("region") else None, **kw)
+        ws.set_model(m, ws.title, None)
+        ws.report = checks.check(m, ws.printer, ws.material)
+        self.on_model(m, ws.title)
+        return {"result": msg, "regions": S.regions(m), "score": ws.report["score"], "size_mm": ws.report["size"]}
 
     def _need_model(self):
         if not self.ws.model:
@@ -256,7 +326,8 @@ class Agent:
 TOOL_ZH = {"list_part_types": "查詢零件庫", "make_part": "設計零件", "check_model": "列印前檢查",
            "transform_model": "調整模型", "search_models": "搜尋 MakerWorld／Printables", "slice_estimate": "切片估算",
            "open_in_bambu_studio": "開啟 Bambu Studio", "printer_status": "讀取印表機狀態",
-           "generate_ai_model": "AI 生成 3D 模型"}
+           "generate_ai_model": "AI 生成 3D 模型", "import_model": "匯入模型", "segment_model": "分區",
+           "list_regions": "查看區塊", "edit_regions": "修改區塊", "cut_model": "切開模型", "add_feature": "鑽孔／加凸台"}
 
 
 def _brief(rep, model):
@@ -305,6 +376,9 @@ class LocalAgent:
             self.ws.printer = pk
         if mk:
             self.ws.material = mk
+        r = self._regions(t, low)
+        if r:
+            return r
         if re.search(r"搜尋|找找|找一個|makerworld|printables", low):
             q = re.sub(r"(幫我|請|在|上|搜尋|找找|找一個|找|makerworld|printables|好用的|一個|的)", " ", t, flags=re.I)
             q = translate_query(q.strip()) or "phone stand"
@@ -368,6 +442,134 @@ class LocalAgent:
                 "• 設計一個 60×40×30 毫米、帶蓋的收納盒\n• 做一個 M3 螺絲用的 L 型支架，寬 30\n"
                 "• 縮放到 12 公分高，檢查能不能放進 A1 Mini\n• 搜尋 cable organizer\n• 我的列印完成了嗎？\n"
                 "內建零件：%s…\n填入 Claude API 金鑰後，會改由 Claude 理解更自由的描述。" % names)
+
+
+    def _regions(self, t, low):
+        """匯入、分區、逐區修改。"""
+        from . import segment as S
+        m = re.search(r"(?:匯入|打開檔案|開啟檔案|載入)\s*[「\"]?([A-Za-z]:[\\/][^「」\"\n]+?\.(?:stl|obj|fbx|ma|mb|mtl|3mf|glb|gltf|ply|off))", t, re.I)
+        if m:
+            try:
+                d = self.a.run_tool("import_model", {"path": m.group(1)})
+            except Exception as e:
+                return "匯入失敗：%s" % e
+            return "已匯入「%s」。%s\n%s\n\n接著可以說「分成 6 區」，再說「第 2 區塗黑色」「第 3 區刪掉」「沿 Z 切兩半」。" % (
+                self.ws.title, " ".join(d["notes"]), self._region_lines(d["regions"]) if d["regions"] else "模型沒有分區資訊。")
+        if not self.ws.model:
+            return None
+        try:
+            return self._region_edit(t, low, S)
+        except S.EditError as e:
+            return str(e)
+        except ValueError as e:
+            return "沒辦法修改：%s" % e
+
+    def _region_edit(self, t, low, S):
+        run = self.a.run_tool
+        if re.search(r"(有哪些|列出|查看|看看).{0,3}區|區塊(清單|列表)", t):
+            r = run("list_regions", {})
+            return r if isinstance(r, str) else self._region_lines(r)
+        m = re.search(r"分成\s*(\d+)\s*(?:區|塊|個區)|^分區$|自動分區|重新分區", t)
+        if m:
+            meth = ("groups" if "材質" in t or "群組" in t else "bodies" if "實體" in t else
+                    "height" if "分層" in t or "高度" in t else "zones" if "空間" in t else
+                    "surface" if "表面" in t else "auto")
+            d = run("segment_model", {"method": meth, "target": int(m.group(1)) if m.group(1) else 8})
+            return "%s：\n%s\n\n用「第 N 區」指定要改的部分，例如「第 2 區塗黑色」「第 1 區放大 1.2 倍」「在第 3 區鑽 9.5 mm 孔」。" % (
+                d["result"], self._region_lines(d["regions"]))
+        m = re.search(r"沿\s*([xyzXYZ])\s*(?:軸)?\s*(?:" + NUM + r"\s*(?:mm|毫米)?\s*(?:處|的地方)?)?\s*(?:切開|切成兩半|切兩半|剖開|切)", t)
+        if m:
+            keep = "below" if re.search(r"留下(半|下面|左|前)", t) else "above" if re.search(r"留上(半|面)|留下上", t) else "both"
+            a = {"axis": m.group(1).lower(), "keep": keep}
+            if m.group(2):
+                a["value"] = float(m.group(2))
+            d = run("cut_model", a)
+            return "%s。\n%s" % (d["result"], self._region_lines(d["regions"]))
+        ids = _region_ids(t)
+        if not ids:
+            return None
+        if not S.has_regions(self.ws.model):
+            return "請先分區，例如說「分成 6 區」。"
+        m = re.search(r"鑽\s*(?:一個|個)?\s*" + NUM + r"\s*(?:mm|毫米|公釐)?\s*(?:的)?\s*(?:圓)?孔|(?:孔徑|直徑)\s*" + NUM, t)
+        if m or re.search(r"鑽孔|開孔|打孔", t):
+            dia = float((m.group(1) or m.group(2)) if m else 5)
+            dep = re.search(r"深\s*" + NUM, t)
+            ax = re.search(r"([xyzXYZ])\s*(?:方向|軸)", t)
+            a = {"kind": "hole", "region": ids[0], "diameter": dia, "axis": ax.group(1).lower() if ax else "z"}
+            if dep:
+                a["depth"] = float(dep.group(1))
+            d = run("add_feature", a)
+            return "%s。\n%s" % (d["result"], self._size(d))
+        m = re.search(r"(?:凸台|圓柱|柱子)", t)
+        if m:
+            dia = re.search(r"(?:直徑)?\s*" + NUM + r"\s*(?:mm|毫米)?\s*(?:的)?\s*(?:凸台|圓柱|柱)", t)
+            hi = re.search(r"高\s*" + NUM, t)
+            d = run("add_feature", {"kind": "boss", "region": ids[0], "diameter": float(dia.group(1)) if dia else 8,
+                                    "height": float(hi.group(1)) if hi else 5})
+            return "%s。\n%s" % (d["result"], self._size(d))
+        if re.search(r"只(保留|留)", t):
+            d = run("edit_regions", {"op": "keep", "regions": ids})
+        elif re.search(r"刪|去掉|拿掉|移除|不要", t):
+            d = run("edit_regions", {"op": "delete", "regions": ids})
+        elif re.search(r"合併|併成", t):
+            d = run("edit_regions", {"op": "merge", "regions": ids})
+        elif re.search(r"取消.{0,2}(顏色|上色)|恢復顏色", t):
+            d = run("edit_regions", {"op": "uncolor", "regions": ids})
+        elif re.search(r"(塗|改成|換成|上|變成|用).{0,4}色|#[0-9a-fA-F]{6}", t):
+            hx = re.search(r"#[0-9a-fA-F]{6}", t)
+            col = hx.group(0) if hx else next((k for k in sorted(S.COLOR_NAMES, key=len, reverse=True) if k in low), None)
+            if not col:
+                return "請說顏色，例如「第 2 區塗黑色」或「第 2 區改成 #FF8800」。"
+            d = run("edit_regions", {"op": "color", "regions": ids, "color": col})
+        elif re.search(r"(改名|命名|叫做|名稱改)", t):
+            nm = re.search(r"(?:改名(?:為|成)?|命名為|叫做|名稱改(?:為|成))\s*[「\"]?([^「」\"，。]+)", t)
+            if not nm:
+                return "請說新名稱，例如「第 1 區改名為握把」。"
+            d = run("edit_regions", {"op": "rename", "regions": ids[:1], "name": nm.group(1).strip()})
+        elif re.search(r"放大|縮小|縮放|倍", t):
+            f = re.search(NUM + r"\s*(?:倍|x|X)", t)
+            pct = re.search(NUM + r"\s*%", t)
+            fac = float(f.group(1)) if f else (float(pct.group(1)) / 100 if pct else (1.1 if "放大" in t else 0.9))
+            if "縮小" in t and fac > 1:
+                fac = 1 / fac
+            d = run("edit_regions", {"op": "scale", "regions": ids, "factor": fac})
+        elif re.search(r"轉|旋轉", t):
+            deg = re.search(NUM + r"\s*(?:度|°)", t)
+            ax = re.search(r"([xyzXYZ])\s*軸?", t)
+            d = run("edit_regions", {"op": "rotate", "regions": ids, "axis": ax.group(1).lower() if ax else "z",
+                                     "degrees": float(deg.group(1)) if deg else 90})
+        elif re.search(r"移|往|推|拉", t):
+            a = {"op": "move", "regions": ids}
+            for ax in "xyz":
+                mm = re.search(ax + r"\s*[=:：]?\s*(-?\d+(?:\.\d+)?)", low)
+                if mm:
+                    a["d" + ax] = float(mm.group(1))
+            dirs = {"上": ("dz", 1), "下": ("dz", -1), "左": ("dx", -1), "右": ("dx", 1), "前": ("dy", -1), "後": ("dy", 1)}
+            for w, (k, sg) in dirs.items():
+                mm = re.search("往" + w + r"\D{0,3}" + NUM, t) or re.search(w + r"移\D{0,3}" + NUM, t)
+                if mm:
+                    a[k] = sg * float(mm.group(1))
+            if len(a) == 2:
+                return "請說移動多少，例如「第 2 區往上 5 mm」或「第 2 區移動 x 3 y 0 z -2」。"
+            d = run("edit_regions", a)
+        else:
+            return None
+        return "%s。\n%s" % (d["result"], self._size(d))
+
+    def _size(self, d):
+        return "整體 %s mm，可列印分數 %s。" % (" × ".join("%g" % v for v in d["size_mm"]), d["score"])
+
+    @staticmethod
+    def _region_lines(regs):
+        return "\n".join("%d. %s（%s mm）%s" % (r["id"], r["name"], " × ".join("%g" % v for v in r["size_mm"]),
+                                                "，耗材色 " + r["color"] if r["filament"] else "") for r in regs)
+
+
+def _region_ids(t):
+    m = re.search(r"第\s*([\d、,，和及與\s]+?)\s*(?:區|塊)", t)
+    if not m:
+        return []
+    return [int(x) for x in re.findall(r"\d+", m.group(1))]
 
 
 def _label(rid, key):
@@ -434,6 +636,30 @@ def extract_params(rid, t, partial=False):
             if g and k in keys:
                 out[k] = _mm(g, unit)
     rest = t
+    # 依參數名稱對應（「電池長度 40」「電池長 40」「紅外線感測器直徑 12」），名稱長的先比對
+    named = []
+    for p in r.params:
+        if p.kind == "bool":
+            continue
+        base = re.sub(r"[（(].*?[）)]", "", p.label).strip()
+        words = {base, re.sub(r"(長度|高度|寬度|厚度)$", lambda m: m.group(1)[0], base)}
+        named += [(w, p) for w in words if len(w) >= 3]
+    for w, p in sorted(named, key=lambda x: -len(x[0])):
+        mm = re.search(re.escape(w) + r"\s*(?:改成|改為|為|是|：|:|=)?\s*" + NUM + UNIT, rest, re.I)
+        if mm and p.key not in out:
+            out[p.key] = float(mm.group(1)) if p.unit in ("", "°") else _mm(mm.group(1), (mm.group(2) or "mm").lower())
+            rest = rest.replace(mm.group(0), " ")
+    if rid == "thermo_gun":
+        if re.search(r"直棒|棒型|筆型|直立", t):
+            out["style"] = 2
+        elif re.search(r"槍型|手槍", t):
+            out["style"] = 1
+        if re.search(r"不(要)?切|整體|不分(兩)?半|一體", t):
+            out["split"] = False
+        elif re.search(r"(切|分)(成)?(左右)?兩半", t):
+            out["split"] = True
+        if re.search(r"(不要|沒有|無)\s*usb", t, re.I):
+            out["usb"] = False
     for word, cands in sorted(WORDS.items(), key=lambda kv: -len(kv[0])):      # 「壁厚」先於「厚」
         found = list(re.finditer(word + r"(?:度|改成|改為|為|是|：|:)?\s*" + NUM + UNIT, rest))
         for mm in found:

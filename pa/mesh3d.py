@@ -6,6 +6,7 @@
 import hashlib
 import json
 import os
+import re
 import tempfile
 from dataclasses import dataclass, field
 
@@ -16,8 +17,9 @@ from . import vend
 
 vend.setup()
 
-FORMATS = {".stl": "STL", ".3mf": "3MF", ".obj": "OBJ", ".glb": "GLB", ".gltf": "glTF", ".ply": "PLY", ".off": "OFF"}
-OPEN_FILTER = ["stl", "3mf", "obj", "glb", "gltf", "ply", "off"]
+FORMATS = {".stl": "STL", ".3mf": "3MF", ".obj": "OBJ", ".glb": "GLB", ".gltf": "glTF", ".ply": "PLY", ".off": "OFF",
+           ".fbx": "FBX", ".ma": "Maya ASCII"}
+OPEN_FILTER = ["stl", "3mf", "obj", "mtl", "fbx", "ma", "mb", "glb", "gltf", "ply", "off"]
 Y_UP_TO_Z_UP = np.array([[1, 0, 0, 0], [0, 0, -1, 0], [0, 1, 0, 0], [0, 0, 0, 1]], dtype=np.float64)
 Z_UP_TO_Y_UP = np.linalg.inv(Y_UP_TO_Z_UP)
 PART_COLORS = [(91, 155, 213), (244, 177, 66), (112, 190, 124), (229, 115, 115), (171, 134, 214), (96, 196, 196)]
@@ -28,6 +30,8 @@ class Part:
     name: str
     mesh: trimesh.Trimesh
     face_rgb: object = None         # (F,3) uint8；None＝單色
+    labels: object = None          # 每個面的區塊編號（分區後才有）
+    label_names: object = None
 
 
 @dataclass
@@ -36,6 +40,7 @@ class Model:
     source: str = ""
     notes: list = field(default_factory=list)
     palette: list = field(default_factory=list)       # 3MF 的耗材顏色
+    region_colors: dict = field(default_factory=dict)  # 區塊名 → 使用者指定的耗材顏色
 
     # ---------------------------------------------------------------- 合併資訊
     def combined(self):
@@ -98,20 +103,104 @@ def from_manifold(parts, source=""):
 # ====================================================================== 讀檔
 def load(path):
     ext = os.path.splitext(path)[1].lower()
+    if ext == ".mb":
+        raise ValueError("Maya .mb 是 Autodesk 的封閉二進位格式，沒有公開規格無法讀取。請在 Maya 用「另存新檔」存成 "
+                         ".ma（Maya ASCII），或「匯出」成 .fbx／.obj 再開啟")
+    if ext == ".mtl":                       # 材質表本身沒有形狀：改開同名的 .obj
+        obj = os.path.splitext(path)[0] + ".obj"
+        if not os.path.isfile(obj):
+            raise ValueError(".mtl 只是 OBJ 的材質（顏色）表，沒有形狀。請開啟同名的 .obj（兩個檔案放在同一個資料夾）")
+        path, ext = obj, ".obj"
     if ext == ".3mf":
         return _load_3mf(path)
+    if ext in (".fbx", ".ma"):
+        return _load_grouped(path, ext)
+    if ext == ".obj" and _obj_has_groups(path):
+        return _load_grouped(path, ext)
     loaded = trimesh.load(path, force=None)
     yup = ext in (".glb", ".gltf") and not _already_upright(loaded)
     parts = _scene_parts(loaded, yup)
     if not parts:
         raise ValueError("檔案裡沒有任何三角面")
     model = Model(parts, path)
+    if ext == ".obj":
+        try:
+            head = open(path, encoding="utf-8", errors="ignore").read(400).lower()
+        except OSError:
+            head = ""
+        if "centimeter" in head or "units: cm" in head:          # Maya／3ds Max 匯出的 OBJ 註明公分
+            for pt in parts:
+                pt.mesh.apply_scale(10.0)
+            model.notes.append("OBJ 註明單位是公分，已換算成 mm（×10）")
+    if ext == ".obj" and len(parts) > 1:      # OBJ 依材質分成好幾塊 → 合成一個網格，材質變成「區塊」
+        from . import segment
+        names = [_short(getattr(p, "mat_name", None) or p.name, path) for p in parts]
+        for p, n in zip(parts, names):
+            p.name = n
+        model = segment.to_single(model)
+        model.notes.append("OBJ 有 %d 個材質群組，已變成 %d 個區塊（可以在「分區」逐區修改）" % (len(parts), len(parts)))
     if ext in (".glb", ".gltf"):
         ext_max = float(max(model.combined().extents))
         if 0 < ext_max < 0.5:                      # glTF 規定單位是公尺 → 換成 mm
             for pt in model.parts:
                 pt.mesh.apply_scale(1000.0)
             model.notes.append("GLB 單位是公尺，已換算成 mm")
+    return model
+
+
+def _obj_has_groups(path):
+    seen = set()
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as f:
+            for line in f:
+                if line.startswith("usemtl"):
+                    seen.add(line.strip())
+                    if len(seen) > 1:
+                        return True
+    except OSError:
+        pass
+    return False
+
+
+def _short(name, path):
+    base = os.path.basename(path)
+    n = str(name)
+    for x in (base + "_", base, os.path.splitext(base)[0] + "_"):
+        if n.startswith(x):
+            n = n[len(x):]
+    return n or "材質 1"
+
+
+def _load_grouped(path, ext):
+    """FBX／Maya ASCII：自己寫的讀取器（pa/importers.py），材質群組變成「區塊」。"""
+    from . import importers, segment
+    try:
+        maya = False
+        if ext == ".obj":
+            got, maya = importers.load_obj_groups(path)
+        else:
+            got = importers.load_fbx(path) if ext == ".fbx" else importers.load_ma(path)
+    except importers.ImportError3D as e:
+        raise ValueError(str(e)) from e
+    parts = []
+    for name, v, t, groups in got:
+        mesh = trimesh.Trimesh(v, t, process=False)
+        p = Part(name, mesh)
+        names = []
+        for g in groups:
+            g = g or name
+            if g not in names:
+                names.append(g)
+        if len(names) > 1:
+            p.labels = np.array([names.index(g or name) for g in groups], dtype=np.int64)
+            p.label_names = names
+        parts.append(p)
+    model = segment.to_single(Model(parts, path))
+    if maya:
+        model.notes.append("OBJ 是 Maya 匯出（公分、Y 朝上），已換算成 mm 並轉成 Z 朝上")
+    n = len(model.parts[0].label_names)
+    if n > 1:
+        model.notes.append("讀到 %d 個材質群組，已變成區塊：%s" % (n, "、".join(model.parts[0].label_names[:8])))
     return model
 
 
@@ -139,7 +228,9 @@ def _scene_parts(loaded, yup):
     for name, g in meshes:
         if yup:
             g.apply_transform(Y_UP_TO_Z_UP)
-        parts.append(Part(name, trimesh.Trimesh(g.vertices, g.faces, process=False), _face_rgb(g, linear=yup)))
+        part = Part(name, trimesh.Trimesh(g.vertices, g.faces, process=False), _face_rgb(g, linear=yup))
+        part.mat_name = re.sub(r"SG$", "", str(getattr(getattr(g.visual, "material", None), "name", "") or "")) or None
+        parts.append(part)
     return parts
 
 
@@ -225,7 +316,11 @@ def export(model, path, name=""):
     if ext == ".stl":
         model.combined().export(path)
     elif ext == ".3mf":
-        write_3mf(model, path, name)
+        if getattr(model, "region_colors", None):           # 有指定耗材顏色的區塊 → Bambu 多色專案 3MF
+            from . import segment
+            segment.export_painted(model, path, name or "模型")
+        else:
+            write_3mf(model, path, name)
     elif ext in (".glb", ".gltf"):
         scene = trimesh.Scene()
         for i, p in enumerate(model.parts):
