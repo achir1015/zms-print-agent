@@ -26,6 +26,9 @@ class RegionScreen(ft.Row):
         self.method = T.dropdown("分區方法", list(S.METHODS.items()), "auto", width=290, filterable=False)
         self.target = T.field("最多幾區", "8", width=100)
         self.list = ft.Column(spacing=2, scroll=ft.ScrollMode.AUTO, expand=True)
+        self.explode = 0.0
+        self.explode_slider = ft.Slider(min=0, max=1, divisions=20, value=0, label="拆開 {value}",
+                                        on_change=lambda e: self.set_explode(e.control.value))
         self.log = ft.Column(spacing=2)
         # 修改參數
         self.f_x, self.f_y, self.f_z = (T.field(a, "0", width=78) for a in ("X mm", "Y mm", "Z mm"))
@@ -76,6 +79,12 @@ class RegionScreen(ft.Row):
             ft.Row([self.method, self.target], wrap=True),
             ft.Row([T.btn("分區", I.DASHBOARD_CUSTOMIZE, lambda e: self.segment(), kind="accent"),
                     T.btn("復原上一步", I.UNDO, lambda e: self.undo(), kind="ghost")]),
+            ft.Divider(height=10, color=T.LINE),
+            ft.Text("拆開／組裝檢視", size=15, weight=ft.FontWeight.W_700),
+            T.muted("每個區塊從物件中心往各自的方向拆開，看清楚每一塊；只影響畫面，不會改到模型。", 12),
+            ft.Row([T.btn("拆開", I.OPEN_IN_FULL, lambda e: self.animate(1.0), kind="outline"),
+                    T.btn("組裝", I.CLOSE_FULLSCREEN, lambda e: self.animate(0.0), kind="outline")], wrap=True),
+            self.explode_slider,
             self.busy,
             ft.Text("處理紀錄", size=13, weight=ft.FontWeight.W_700), self.log], spacing=8, scroll=ft.ScrollMode.AUTO, expand=True),
             padding=14, width=330)
@@ -115,6 +124,8 @@ class RegionScreen(ft.Row):
         if log:
             self.note(log)
         self.render_list()
+        if self.explode > 0 or self.sel:
+            self.highlight()
         T.safe_update(self)
 
     def render_list(self):
@@ -152,11 +163,51 @@ class RegionScreen(ft.Row):
             return
         import numpy as np
         p = m.parts[0]
-        view = mesh3d.Model([mesh3d.Part(p.name, p.mesh, p.face_rgb.copy() if p.face_rgb is not None else None)])
-        if self.sel and view.parts[0].face_rgb is not None:
+        rgb = p.face_rgb.copy() if p.face_rgb is not None else None
+        if self.sel and rgb is not None:
             dim = ~np.isin(p.labels, [i - 1 for i in self.sel])
-            view.parts[0].face_rgb[dim] = (view.parts[0].face_rgb[dim] * 0.25 + 190 * 0.75).astype(np.uint8)
+            rgb[dim] = (rgb[dim] * 0.25 + 190 * 0.75).astype(np.uint8)
+        if self.explode > 0:
+            view = S.explode_view(m, self.explode, rgb)
+            view.view_note = "（拆開檢視，實際尺寸見下方）"
+        else:
+            view = mesh3d.Model([mesh3d.Part(p.name, p.mesh, rgb)])
         self.panel.viewer.set_model(view, keep_view=True)
+
+    def set_explode(self, k):
+        m = self.panel.ws.model
+        if m is None or not S.has_regions(m):
+            self.ctx.toast("請先分區，才能拆開檢視", True)
+            self.explode_slider.value = 0
+            T.safe_update(self.explode_slider)
+            return
+        self.explode = float(k)
+        self.highlight()
+
+    def animate(self, target):
+        """拆開／組裝：分幾格慢慢移動，看得出每一塊從哪裡來。"""
+        import threading
+        import time
+        m = self.panel.ws.model
+        if m is None or not S.has_regions(m):
+            self.ctx.toast("請先分區，才能拆開檢視", True)
+            return
+        start = self.explode
+
+        def go():
+            steps = 8
+            for i in range(1, steps + 1):
+                t = i / steps
+                k = start + (target - start) * (1 - (1 - t) ** 2)
+                self.explode = k
+                self.explode_slider.value = round(k, 2)
+                T.safe_update(self.explode_slider)
+                self.highlight()
+                time.sleep(0.12)
+            time.sleep(0.4)          # 最後再畫一次，避免較慢的中間畫面蓋過最後的樣子
+            self.explode = target
+            self.highlight()
+        threading.Thread(target=go, daemon=True).start()
 
     # ------------------------------------------------------------------ 動作
     async def open_file(self):

@@ -1,7 +1,7 @@
 ﻿; 資料助秘3D列印AI代理人工具 — Windows 安裝程式（Inno Setup 6）
 ; 建置：python tools\build_windows.py（會先打包程式再呼叫 ISCC）
 #ifndef AppVer
-  #define AppVer "1.1.1"
+  #define AppVer "1.2.0"
 #endif
 #define AppName "資料助秘3D列印AI代理人工具"
 #define AppExe "ZMSPrintAgent.exe"

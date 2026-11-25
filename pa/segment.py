@@ -104,6 +104,34 @@ def _paint(model):
     model.palette = [model.region_colors[n] for n in p.label_names if n in model.region_colors]
 
 
+def explode_view(model, k=1.0, face_rgb=None):
+    """拆開檢視（只給畫面用，不改模型）：每個區塊沿「整體中心 → 區塊中心」的方向往外推。
+    k＝0 是組裝好的樣子，1 是完全拆開。中心剛好在整體中心的區塊（例如主體）留在原地。"""
+    p = model.parts[0]
+    mesh, lab = p.mesh, np.asarray(p.labels)
+    rgb = face_rgb if face_rgb is not None else p.face_rgb
+    tri = np.asarray(mesh.triangles)
+    area = np.asarray(mesh.area_faces) + 1e-12
+    cen = tri.mean(axis=1)
+    whole = (cen * area[:, None]).sum(0) / area.sum()
+    diag = float(np.linalg.norm(mesh.extents))
+    out = tri.copy()
+    for i in range(len(p.label_names)):
+        f = lab == i
+        if not f.any():
+            continue
+        rc = (cen[f] * area[f, None]).sum(0) / area[f].sum()
+        d = rc - whole
+        n = float(np.linalg.norm(d))
+        if n < diag * 0.02:
+            continue
+        out[f] += (d * 0.8 + d / n * diag * 0.15) * k
+    v = out.reshape(-1, 3)
+    faces = np.arange(len(v)).reshape(-1, 3)
+    shown = mesh3d.Part(p.name, trimesh.Trimesh(v, faces, process=False), None if rgb is None else np.asarray(rgb).copy())
+    return mesh3d.Model([shown])
+
+
 def has_regions(model):
     return len(model.parts) == 1 and getattr(model.parts[0], "labels", None) is not None
 

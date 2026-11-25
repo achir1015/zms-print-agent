@@ -70,7 +70,7 @@ class Viewer(ft.Container):
             self.scene = render.Scene(v, f, c, plate=self.plate)
             i = model.info()
             self.info.value = "%s mm · %s 面" % (" × ".join("%g" % round(x, 1) for x in i["size"]),
-                                               "{:,}".format(i["triangles"]))
+                                               "{:,}".format(i["triangles"])) + getattr(model, "view_note", "")
             if not keep_view:
                 self.yaw, self.pitch, self.zoom = VIEWS["iso"][0], VIEWS["iso"][1], 1.0
             self._request(False)

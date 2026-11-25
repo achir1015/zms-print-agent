@@ -150,3 +150,13 @@ def test_local_agent_region_commands(tmp_path):
 def test_importers_triangulate():
     tri = importers.triangulate([0, 1, 2, 3, 4])
     assert len(tri) == 3
+
+
+def test_explode_view_moves_outer_regions(tmp_path):
+    m = mesh3d.load(_two_part_obj(tmp_path))
+    v0 = segment.explode_view(m, 0).combined().extents
+    v1 = segment.explode_view(m, 1).combined().extents
+    assert np.allclose(v0, m.combined().extents, atol=0.01)
+    assert v1[2] > v0[2] + 5                       # 上面的圓柱往上拆開
+    assert len(segment.explode_view(m, 1).parts[0].mesh.faces) == len(m.parts[0].mesh.faces)
+    assert m.combined().extents[2] == pytest.approx(22, abs=0.2)   # 原模型沒被改
