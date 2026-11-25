@@ -34,9 +34,9 @@ class RegionScreen(ft.Row):
         self.f_axis = T.dropdown("軸", [("x", "X"), ("y", "Y"), ("z", "Z")], "z", width=78, filterable=False)
         self.f_color = T.dropdown("顏色", [(k, k) for k in ("紅", "橙", "黃", "綠", "藍", "淺藍", "紫", "粉紅", "黑", "白", "灰", "金", "咖啡")],
                                   "黑", width=100, filterable=False)
-        self.f_d = T.field("直徑／寬 mm", "3", width=100)
-        self.f_depth = T.field("深度／高 mm（0＝貫穿）", "0", width=150)
-        self.f_shape = T.dropdown("形狀", [("circle", "圓形"), ("box", "方形")], "circle", width=96, filterable=False)
+        self.f_d = T.field("直徑 mm", "3", width=100)
+        self.f_depth = T.field("深度／高 mm", "0", width=120)
+        self.f_shape = T.dropdown("形狀", [("circle", "圓形"), ("box", "方形")], "circle", width=124, filterable=False)
         self.f_name = T.field("新名稱", "", width=150)
 
         def act(label, icon, fn, kind="outline", tip=None):
@@ -59,6 +59,7 @@ class RegionScreen(ft.Row):
             ft.Divider(height=8, color=T.LINE),
             ft.Text("整個模型", size=14, weight=ft.FontWeight.W_700),
             ft.Row([self.f_shape, self.f_d, self.f_depth], wrap=True, spacing=6),
+            T.muted("鑽孔：深度 0＝貫穿；加凸台：填高度（0＝5 mm）。", 11),
             ft.Row([act("在勾選區中心鑽孔", I.RADIO_BUTTON_UNCHECKED, lambda: self.hole()),
                     act("在勾選區中心加凸台", I.ADD_CIRCLE_OUTLINE, lambda: self.boss())], wrap=True, spacing=6),
             ft.Row([act("沿 X 切兩半", I.CONTENT_CUT, lambda: self.cut("x")), act("沿 Y 切兩半", I.CONTENT_CUT, lambda: self.cut("y")),

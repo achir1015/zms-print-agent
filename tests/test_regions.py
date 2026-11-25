@@ -31,6 +31,27 @@ def _two_part_obj(tmp_path, maya=False):
     return str(p)
 
 
+def test_grouped_single_mesh_gets_region_colors(tmp_path):
+    """單一網格本身有材質群組（FBX／MA 常見）→ 預覽要依區塊上不同顏色。"""
+    from pa import importers
+    a = trimesh.creation.box((20, 20, 20))
+    b = trimesh.creation.box((5, 5, 5))
+    b.apply_translation((0, 0, 12.5))
+    v = np.vstack([a.vertices, b.vertices])
+    f = np.vstack([a.faces, b.faces + len(a.vertices)])
+    groups = ["Body"] * len(a.faces) + ["button"] * len(b.faces)
+    orig = importers.load_fbx
+    importers.load_fbx = lambda path: [("mesh", v, f, groups)]
+    try:
+        p = tmp_path / "x.fbx"
+        p.write_bytes(b"")
+        m = mesh3d.load(str(p))
+    finally:
+        importers.load_fbx = orig
+    _, _, c = m.arrays()
+    assert len(np.unique(c, axis=0)) == 2
+
+
 def test_obj_groups_and_maya_units(tmp_path):
     for maya in (False, True):
         m = mesh3d.load(_two_part_obj(tmp_path, maya))

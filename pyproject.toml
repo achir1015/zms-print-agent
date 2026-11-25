@@ -1,6 +1,6 @@
 [project]
 name = "zms-print-agent"
-version = "1.1.0"
+version = "1.1.1"
 description = "資料助秘3D列印AI代理人工具"
 authors = [{ name = "吳玉柱" }]
 requires-python = ">=3.10"

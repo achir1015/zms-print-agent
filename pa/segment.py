@@ -49,6 +49,10 @@ def hexrgb(h):
 def to_single(model):
     """所有零件合併成一個網格（相同位置的頂點焊接起來 → 能判斷封閉），每個面帶區塊編號。"""
     if len(model.parts) == 1 and getattr(model.parts[0], "labels", None) is not None:
+        if model.parts[0].face_rgb is None or len(model.parts[0].face_rgb) != len(model.parts[0].labels):
+            if not hasattr(model, "region_colors"):
+                model.region_colors = {}
+            _paint(model)          # 單一網格本身就有材質群組（FBX／MA）→ 也要依區塊上色
         return model
     vs, fs, labels, names, rgbs, off = [], [], [], [], [], 0
     for i, p in enumerate(model.parts):
