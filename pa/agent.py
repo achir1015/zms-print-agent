@@ -447,10 +447,10 @@ class LocalAgent:
     def _regions(self, t, low):
         """匯入、分區、逐區修改。"""
         from . import segment as S
-        m = re.search(r"(?:匯入|打開檔案|開啟檔案|載入)\s*[「\"]?([A-Za-z]:[\\/][^「」\"\n]+?\.(?:stl|obj|fbx|ma|mb|mtl|3mf|glb|gltf|ply|off))", t, re.I)
+        m = re.search(r"(?:匯入|打開檔案|開啟檔案|載入)\s*[「\"]?((?:[A-Za-z]:[\\/]|/|~/)[^「」\"\n]+?\.(?:stl|obj|fbx|ma|mb|mtl|3mf|glb|gltf|ply|off))", t, re.I)
         if m:
             try:
-                d = self.a.run_tool("import_model", {"path": m.group(1)})
+                d = self.a.run_tool("import_model", {"path": os.path.expanduser(m.group(1))})
             except Exception as e:
                 return "匯入失敗：%s" % e
             return "已匯入「%s」。%s\n%s\n\n接著可以說「分成 6 區」，再說「第 2 區塗黑色」「第 3 區刪掉」「沿 Z 切兩半」。" % (

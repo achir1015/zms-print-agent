@@ -1,6 +1,7 @@
 """線上版（docs/app 的 JavaScript）和電腦版（Python）要算出一樣的零件與檢查結果。需要 Node 22，沒有就略過。"""
 import json
 import os
+import shutil
 import subprocess
 
 import pytest
@@ -9,11 +10,11 @@ from pa import checks, mesh3d, recipes
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 APP = os.path.join(HERE, "docs", "app")
-NODE = os.path.expandvars(r"%LOCALAPPDATA%\nvm\v22.22.3\node.exe") if os.name == "nt" else "node"
+NODE = os.path.expandvars(r"%LOCALAPPDATA%\nvm\v22.22.3\node.exe") if os.name == "nt" else (shutil.which("node") or "")
 
 
 def _node(script):
-    if os.name == "nt" and not os.path.isfile(NODE):
+    if not NODE or not os.path.isfile(NODE):
         pytest.skip("沒有 Node 22")
     if not os.path.isfile(os.path.join(APP, "lib", "manifold.js")):
         pytest.skip("沒有 docs/app/lib（python tools/make_pages.py --libs）")
@@ -51,7 +52,7 @@ def test_regions_match_python(tmp_path):
     base = os.path.dirname(HERE)
     files = [os.path.join(base, "數位溫度計3D模型." + e) for e in ("fbx", "ma")]
     files = [f for f in files if os.path.isfile(f)]
-    if os.name == "nt" and not os.path.isfile(NODE):
+    if not NODE or not os.path.isfile(NODE):
         pytest.skip("沒有 Node 22")
     out = subprocess.run([NODE, os.path.join(HERE, "tools", "webref", "regions.mjs"), APP.replace("\\", "/")] + [f.replace("\\", "/") for f in files],
                          capture_output=True, text=True, encoding="utf-8", check=True).stdout
