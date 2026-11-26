@@ -1,5 +1,5 @@
 // 離線快取：改了程式要遞增 CACHE，使用者才會拿到新版
-const CACHE = "zms-print-agent-v4";
+const CACHE = "zms-print-agent-v5";
 const CORE = ["./", "index.html", "icon.png", "manifest.webmanifest", "app/", "app/index.html", "app/style.css", "app/app.js",
   "app/data.js", "app/engine.js", "app/checks.js", "app/mesh.js", "app/agent.js", "app/viewer.js", "app/regions.js",
   "app/bambu/project_settings.config", "app/bambu/per_filament_keys.json", "app/icon.png",

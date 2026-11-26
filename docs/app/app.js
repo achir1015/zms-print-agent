@@ -227,7 +227,7 @@ S.agent = (v) => {
   const ex = ["設計一個尺寸為 60×40×30 毫米、帶蓋的電子元件盒", "做一個 M3 螺絲用的 L 型支架，寬 30", "縮放到 12 公分高，檢查是否適合我的 A1 Mini",
     "在 MakerWorld 幫我找好用的電線整理器", "設計額溫槍外殼，用 GOOUUU ESP32-S3 開發板", "設計桌下耳機掛鉤，下垂高度 35", "正齒輪 齒數 30 模數 2"];
   const box = h(`<div class="split"><div class="card panel">
-      <div class="row"><h3 style="flex:1">🤖 3D 列印 AI 代理人</h3><span class="chip ${claude ? "t-violet" : "t-teal"}">${claude ? "Claude " + MODEL : "本機規則（免費）"}</span>
+      <div class="row"><h3 style="flex:1 1 200px;min-width:0">🤖 3D 列印 AI 代理人</h3><span class="chip ${claude ? "t-violet" : "t-teal"}">${claude ? "Claude " + MODEL : "本機規則（免費）"}</span>
         <label class="btn ghost small" title="匯入現成模型（STL、OBJ、FBX、Maya .ma、3MF、GLB）再分區修改">📂 匯入模型<input type="file" id="impModel" accept=".stl,.obj,.fbx,.ma,.mb,.mtl,.3mf,.glb,.gltf,.ply" hidden></label>
         <button class="btn ghost small" id="newChat">新對話</button></div>
       <div class="chat" id="chat"></div><div class="muted" id="st"></div>
