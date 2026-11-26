@@ -31,7 +31,7 @@ echo "== flet pack"
   --hidden-import scipy.sparse.csgraph --hidden-import scipy.ndimage --hidden-import scipy.cluster.vq \
   --hidden-import networkx --hidden-import lxml.etree --hidden-import PIL.ImageDraw --hidden-import manifold3d \
   --hidden-import anthropic --hidden-import rtree --hidden-import trimesh.exchange.threemf \
-  --hidden-import trimesh.exchange.gltf \
+  --hidden-import trimesh.exchange.gltf --hidden-import shapely --hidden-import shapely.geometry \
   --pyinstaller-build-args=--collect-all=trimesh --pyinstaller-build-args=--collect-all=manifold3d \
   --pyinstaller-build-args=--collect-submodules=paho --pyinstaller-build-args=--collect-submodules=networkx \
   --pyinstaller-build-args=--collect-all=flet_web --pyinstaller-build-args=--collect-all=flet_audio \

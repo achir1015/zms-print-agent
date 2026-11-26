@@ -1,7 +1,7 @@
 // 由 tools/make_pages.py 產生，請勿手動修改
 export const DATA = {
  "app": "資料助秘3D列印AI代理人工具",
- "version": "1.0.0",
+ "version": "1.2.0",
  "repo": "achir1015/zms-print-agent",
  "printers": {
   "A1 Mini": {
@@ -571,6 +571,355 @@ export const DATA = {
      "step": 1,
      "unit": "",
      "doc": "",
+     "kind": "bool"
+    }
+   ]
+  },
+  {
+   "id": "thermo_gun",
+   "name": "額溫槍外殼",
+   "category": "外殼",
+   "icon": "THERMOSTAT",
+   "desc": "槍型或直棒型額溫槍外殼：GOOUUU ESP32-S3（42 pin）開發板導軌、鋰電池槽、MLX90614 紅外線感測器座、0.96 吋 OLED 螢幕框、扳機按鍵孔、USB-C 開口、M2 合殼螺絲柱；切成左右兩半殼平放列印。",
+   "keywords": [
+    "額溫",
+    "溫度計",
+    "測溫",
+    "體溫",
+    "紅外線",
+    "thermometer",
+    "esp32",
+    "槍"
+   ],
+   "params": [
+    {
+     "key": "style",
+     "label": "外形（1 槍型、2 直棒型）",
+     "default": 1,
+     "min": 1,
+     "max": 2,
+     "step": 1,
+     "unit": "",
+     "doc": "直棒型會自動加長到放得下電池與開發板",
+     "kind": "int"
+    },
+    {
+     "key": "head_l",
+     "label": "槍頭（機身）長度",
+     "default": 120,
+     "min": 80,
+     "max": 220,
+     "step": 1,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "head_w",
+     "label": "槍頭寬度",
+     "default": 40,
+     "min": 30,
+     "max": 70,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "head_h",
+     "label": "槍頭高度",
+     "default": 46,
+     "min": 30,
+     "max": 80,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "corner",
+     "label": "外形圓角",
+     "default": 10,
+     "min": 2,
+     "max": 25,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "nose_d",
+     "label": "鼻頭直徑",
+     "default": 26,
+     "min": 16,
+     "max": 40,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "nose_l",
+     "label": "鼻頭長度",
+     "default": 14,
+     "min": 5,
+     "max": 40,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "handle_l",
+     "label": "握把長度",
+     "default": 95,
+     "min": 70,
+     "max": 140,
+     "step": 1,
+     "unit": "mm",
+     "doc": "要放得下開發板長度＋約 20 mm",
+     "kind": "num"
+    },
+    {
+     "key": "handle_w",
+     "label": "握把寬度（左右）",
+     "default": 34,
+     "min": 30,
+     "max": 50,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "內寬要比開發板寬 2 mm 以上",
+     "kind": "num"
+    },
+    {
+     "key": "handle_d",
+     "label": "握把厚度（前後）",
+     "default": 36,
+     "min": 26,
+     "max": 60,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "handle_angle",
+     "label": "握把後傾角度",
+     "default": 15,
+     "min": 0,
+     "max": 35,
+     "step": 1,
+     "unit": "°",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "wall",
+     "label": "壁厚",
+     "default": 2.0,
+     "min": 1.2,
+     "max": 4,
+     "step": 0.2,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "board_l",
+     "label": "開發板長度",
+     "default": 63.5,
+     "min": 40,
+     "max": 90,
+     "step": 0.1,
+     "unit": "mm",
+     "doc": "GOOUUU ESP32-S3 42 pin 約 63.5 mm，請用卡尺量",
+     "kind": "num"
+    },
+    {
+     "key": "board_w",
+     "label": "開發板寬度",
+     "default": 28,
+     "min": 18,
+     "max": 40,
+     "step": 0.1,
+     "unit": "mm",
+     "doc": "約 28 mm（含排針）",
+     "kind": "num"
+    },
+    {
+     "key": "board_t",
+     "label": "開發板厚度",
+     "default": 1.6,
+     "min": 0.8,
+     "max": 2.4,
+     "step": 0.1,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "board_under",
+     "label": "板子背面空間",
+     "default": 3,
+     "min": 0,
+     "max": 12,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "背面有排針或元件時加大",
+     "kind": "num"
+    },
+    {
+     "key": "usb",
+     "label": "USB-C 開口",
+     "default": true,
+     "min": 0,
+     "max": 1,
+     "step": 1,
+     "unit": "",
+     "doc": "",
+     "kind": "bool"
+    },
+    {
+     "key": "usb_w",
+     "label": "USB-C 開口寬",
+     "default": 10,
+     "min": 8,
+     "max": 16,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "usb_h",
+     "label": "USB-C 開口高",
+     "default": 4.5,
+     "min": 3,
+     "max": 8,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "battery_l",
+     "label": "電池長度",
+     "default": 50,
+     "min": 20,
+     "max": 80,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "503450 鋰電池 50×34×5 mm",
+     "kind": "num"
+    },
+    {
+     "key": "battery_w",
+     "label": "電池寬度",
+     "default": 34,
+     "min": 15,
+     "max": 60,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "battery_t",
+     "label": "電池厚度",
+     "default": 6,
+     "min": 3,
+     "max": 20,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "sensor_d",
+     "label": "紅外線感測器直徑",
+     "default": 9.5,
+     "min": 6,
+     "max": 20,
+     "step": 0.1,
+     "unit": "mm",
+     "doc": "MLX90614 金屬罐約 9.2 mm",
+     "kind": "num"
+    },
+    {
+     "key": "oled_w",
+     "label": "OLED 模組寬",
+     "default": 27,
+     "min": 15,
+     "max": 45,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "oled_h",
+     "label": "OLED 模組高",
+     "default": 27,
+     "min": 15,
+     "max": 45,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "win_w",
+     "label": "螢幕窗寬",
+     "default": 23,
+     "min": 10,
+     "max": 40,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "win_h",
+     "label": "螢幕窗高",
+     "default": 12,
+     "min": 6,
+     "max": 30,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "button_d",
+     "label": "按鍵孔直徑",
+     "default": 7,
+     "min": 3,
+     "max": 14,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "",
+     "kind": "num"
+    },
+    {
+     "key": "screw_d",
+     "label": "合殼螺絲直徑",
+     "default": 2,
+     "min": 2,
+     "max": 3,
+     "step": 0.5,
+     "unit": "mm",
+     "doc": "M2 就填 2",
+     "kind": "num"
+    },
+    {
+     "key": "split",
+     "label": "切成左右兩半殼（列印用）",
+     "default": true,
+     "min": 0,
+     "max": 1,
+     "step": 1,
+     "unit": "",
+     "doc": "關掉＝看組合後的外形",
      "kind": "bool"
     }
    ]
@@ -1849,7 +2198,7 @@ export const DATA = {
   {
    "key": "intro",
    "title": "認識資料助秘3D列印AI代理人工具",
-   "voice": "歡迎使用資料助秘3D列印AI代理人工具。這套系統把一句描述變成可以在拓竹印表機列印的零件。你可以直接告訴 AI 代理人想印什麼、大概多大，它會設計零件、做七項列印前檢查，並估算列印時間和耗材克數。功能性的零件用參數化零件庫，精確到零點一毫米；日常用品可以先搜尋 MakerWorld 和 Printables 的現成設計；人物和擺件可以用 AI 文字或照片轉 3D。滿意以後按 Bambu Studio，模型會在 Bambu Studio 開啟，由你自己檢查、切片、按列印，系統不會自己開始列印。每個設計都存在設計庫，修改一次就多一個版本，核准後檔案和雜湊值會凍結。",
+   "voice": "歡迎使用資料助秘3D列印AI代理人工具。這套系統把一句描述變成可以在拓竹印表機列印的零件。你可以直接告訴 AI 代理人想印什麼、大概多大，它會設計零件、做七項列印前檢查，並估算列印時間和耗材克數。功能性的零件用參數化零件庫，精確到零點一毫米；日常用品可以先搜尋 MakerWorld 和 Printables 的現成設計；人物和擺件可以用 AI 文字或照片轉 3D；零件庫沒有的外殼，可以匯入現成模型，分成區塊逐一修改。滿意以後按 Bambu Studio，模型會在 Bambu Studio 開啟，由你自己檢查、切片、按列印，系統不會自己開始列印。每個設計都存在設計庫，修改一次就多一個版本，核准後檔案和雜湊值會凍結。",
    "steps": [
     {
      "icon": "SMART_TOY",
@@ -2020,6 +2369,43 @@ export const DATA = {
    ]
   },
   {
+   "key": "regions",
+   "title": "匯入現成模型、分區逐一修改",
+   "voice": "零件庫沒有的東西，例如額溫槍外殼，可以先找現成的模型匯入。支援 STL、OBJ 加上同名的 MTL、FBX、Maya 的 ma 檔、3MF 和 GLB；Maya 的 mb 檔是封閉格式，請先在 Maya 另存成 ma 或匯出 fbx。匯入後按分區，系統會依原檔的材質群組、互不相連的實體、表面轉折或空間位置，把模型分成幾個區塊，每一區用不同顏色顯示。勾選要修改的區塊，可以刪除、只保留、移動、縮放、旋轉、改名、合併，也可以指定耗材顏色，存檔時會變成 Bambu Studio 的多色 3MF，AMS 直接列印。還能在區塊中心鑽孔或加凸台、沿 X、Y、Z 切成兩半。每一步都能復原，AI 代理人也可以幫你做，例如說：分成六區、第三區刪掉、第二區塗黑色。",
+   "steps": [
+    {
+     "icon": "FOLDER_OPEN",
+     "tone": "blue",
+     "text": "匯入 STL、OBJ、FBX、Maya",
+     "page": "regions"
+    },
+    {
+     "icon": "DASHBOARD_CUSTOMIZE",
+     "tone": "violet",
+     "text": "自動分成幾個區塊",
+     "page": "regions"
+    },
+    {
+     "icon": "CHECK_BOX",
+     "tone": "amber",
+     "text": "勾選要改的區塊",
+     "page": "regions"
+    },
+    {
+     "icon": "FORMAT_PAINT",
+     "tone": "rose",
+     "text": "刪除、縮放、上色、鑽孔",
+     "page": "regions"
+    },
+    {
+     "icon": "CONTENT_CUT",
+     "tone": "teal",
+     "text": "切成兩半、存檔列印",
+     "page": "regions"
+    }
+   ]
+  },
+  {
    "key": "printer",
    "title": "Bambu Studio、切片估算與印表機",
    "voice": "按 Bambu Studio，模型會存成 3MF 並在 Bambu Studio 開啟。請檢查下方的尺寸、確認沒有懸空的部分，按 Ctrl 加 R 切片，看時間、耗材和支撐，滿意後由你自己按列印。切片估算會在背景用 Bambu Studio 自己的引擎和設定檔切一次，大約三十秒，算出含開始程序的列印時間和克數。印表機狀態要先設定區網 IP、序號和存取碼，存取碼只存在這台電腦。連線是唯讀的，可以看進度、剩餘時間、噴嘴和熱床溫度、AMS 裝了哪些耗材，但不能開始、暫停或改變列印，暫停或取消請在印表機螢幕或 Bambu Handy 操作。",
@@ -2141,6 +2527,10 @@ export const DATA = {
   "library": {
    "title": "設計庫",
    "voice": "左邊是所有設計的縮圖，點一個看明細：版本、雜湊值、檢查結果和切片紀錄，可以繼續編輯、核准或匯出。"
+  },
+  "regions": {
+   "title": "匯入與分區編輯",
+   "voice": "左邊匯入模型並按分區，中間勾選區塊後選擇修改方式，右邊即時顯示；每一步都能按復原。"
   },
   "check": {
    "title": "檢查與修復",

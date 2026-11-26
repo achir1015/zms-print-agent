@@ -5,6 +5,7 @@ import { check } from "./checks.js";
 import * as MS from "./mesh.js";
 import { Viewer } from "./viewer.js";
 import { Agent, MODEL, translateQuery, searchLinks } from "./agent.js";
+import * as RG from "./regions.js";
 
 const $ = (s, el = document) => el.querySelector(s);
 const h = (html) => { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; };
@@ -52,8 +53,10 @@ const DB = {
   put(d) { return this.tx("readwrite", (s) => s.put(d)); },
   del(id) { return this.tx("readwrite", (s) => s.delete(id)); },
 };
+/** 3MF：有指定耗材顏色的區塊 → Bambu 多色專案，否則一般 3MF。 */
+async function to3MF(ws) { return RG.hasFilaments(ws.parts) ? (await RG.writePainted3MF(ws.parts, ws.title))[0] : MS.write3MF(ws.parts, ws.title); }
 async function saveDesign(ws, thumb, designId) {
-  const bytes = MS.write3MF(ws.parts, ws.title), sha = await MS.sha256(bytes);
+  const bytes = await to3MF(ws), sha = await MS.sha256(bytes);
   let d = designId ? await DB.get(designId) : null;
   const rev = { rev: d ? d.revs.length + 1 : 1, at: Date.now(), params: ws.recipe ? ws.recipe[1] : {}, sha, size: bytes.length,
     file: bytes, score: ws.report?.score ?? null, report: ws.report };
@@ -109,7 +112,7 @@ class ModelPanel {
     const opt = () => { ws.printer = $(".pr", this.el).value; ws.material = $(".mat", this.el).value; ws.purpose = $(".pur", this.el).value;
       store.set("pa_printer", ws.printer); store.set("pa_material", ws.material); this.recheck(); };
     $(".pr", this.el).onchange = opt; $(".mat", this.el).onchange = opt; $(".pur", this.el).onchange = opt;
-    $(".dl3mf", this.el).onclick = () => this.need() && download(safeName(ws.title) + ".3mf", MS.write3MF(ws.parts, ws.title));
+    $(".dl3mf", this.el).onclick = async () => this.need() && download(safeName(ws.title) + ".3mf", await to3MF(ws));
     $(".save", this.el).onclick = () => this.save();
     $(".exp", this.el).onchange = async (e) => {
       const x = e.target.value; e.target.value = ""; if (!x || !this.need()) return;
@@ -157,7 +160,7 @@ const MENU = [
   ["總覽", [["home", "首頁", "🏠"]]],
   ["AI 代理人", [["agent", "AI 代理人", "🤖"]]],
   ["設計", [["design", "零件設計", "📐"], ["library", "設計庫", "📚"]]],
-  ["模型工具", [["check", "檢查與修復", "🩺"], ["convert", "格式轉換（3MF→GLB）", "🔄"], ["search", "搜尋現成模型", "🔎"]]],
+  ["模型工具", [["regions", "匯入與分區編輯", "🧩"], ["check", "檢查與修復", "🩺"], ["convert", "格式轉換（3MF→GLB）", "🔄"], ["search", "搜尋現成模型", "🔎"]]],
   ["設定與說明", [["aiset", "設定", "⚙️"], ["help", "語音動態教學", "🔊"]]],
 ];
 const TITLES = Object.fromEntries(MENU.flatMap(([, it]) => it.map(([k, t]) => [k, t])));
@@ -188,7 +191,7 @@ S.home = async (v) => {
       <div class="ask"><input id="ask" type="text" placeholder="例如：設計一個 60×40×30 mm 帶蓋的電子元件盒"><button class="btn gold" id="askBtn">問代理人</button></div></div>
       <img src="icon.png" alt=""></div>
     <div class="ways">
-      ${[["agent", "🤖", "AI 代理人", "用說的：描述與尺寸"], ["design", "📐", "零件設計", "18 種參數化零件"], ["check", "🩺", "檢查與修復", "STL／3MF／GLB 七項檢查"],
+      ${[["agent", "🤖", "AI 代理人", "用說的：描述與尺寸"], ["design", "📐", "零件設計", RECIPES.length + " 種參數化零件"], ["regions", "🧩", "匯入與分區編輯", "FBX／OBJ／Maya 分區逐一修改"], ["check", "🩺", "檢查與修復", "STL／3MF／GLB 七項檢查"],
         ["search", "🔎", "搜尋現成模型", "MakerWorld、Printables"], ["convert", "🔄", "3MF → GLB", "多色專案轉通用格式"]].map(([k, ic, t, s]) =>
         `<div class="card way" data-go="${k}"><div class="big">${ic}</div><b>${t}</b><span class="muted">${s}</span></div>`).join("")}</div>
     <div class="card"><div class="row"><h3 style="flex:1">最近的設計</h3><a class="btn ghost small" href="#library">設計庫 →</a></div><div class="grid" id="recent" style="margin-top:10px"></div></div>
@@ -217,14 +220,15 @@ S.agent = (v) => {
   agent = agent || new Agent(ws, {});
   agent.hooks = {
     onModel: () => panel.show(true), onStatus: (t) => { $("#st").textContent = t; },
-    onDownload: (w) => download(safeName(w.title) + ".3mf", MS.write3MF(w.parts, w.title)),
+    onDownload: async (w) => download(safeName(w.title) + ".3mf", await to3MF(w)),
     onLinks: (q, L) => addMsg("ai", `🔎 搜尋「${q}」：`, "", [["MakerWorld", L.makerworld], ["Printables", L.printables]]),
   };
   const claude = agent.useClaude();
   const ex = ["設計一個尺寸為 60×40×30 毫米、帶蓋的電子元件盒", "做一個 M3 螺絲用的 L 型支架，寬 30", "縮放到 12 公分高，檢查是否適合我的 A1 Mini",
-    "在 MakerWorld 幫我找好用的電線整理器", "設計桌下耳機掛鉤，下垂高度 35", "正齒輪 齒數 30 模數 2"];
+    "在 MakerWorld 幫我找好用的電線整理器", "設計額溫槍外殼，用 GOOUUU ESP32-S3 開發板", "設計桌下耳機掛鉤，下垂高度 35", "正齒輪 齒數 30 模數 2"];
   const box = h(`<div class="split"><div class="card panel">
       <div class="row"><h3 style="flex:1">🤖 3D 列印 AI 代理人</h3><span class="chip ${claude ? "t-violet" : "t-teal"}">${claude ? "Claude " + MODEL : "本機規則（免費）"}</span>
+        <label class="btn ghost small" title="匯入現成模型（STL、OBJ、FBX、Maya .ma、3MF、GLB）再分區修改">📂 匯入模型<input type="file" id="impModel" accept=".stl,.obj,.fbx,.ma,.mb,.mtl,.3mf,.glb,.gltf,.ply" hidden></label>
         <button class="btn ghost small" id="newChat">新對話</button></div>
       <div class="chat" id="chat"></div><div class="muted" id="st"></div>
       <div class="composer"><textarea id="inp" rows="2" placeholder="描述您要印的東西，例如：設計一個 60×40×30 mm 帶蓋的盒子（Enter 送出，Shift+Enter 換行）"></textarea>
@@ -261,6 +265,13 @@ S.agent = (v) => {
   $("#send").onclick = () => send();
   $("#inp").onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } };
   $("#newChat").onclick = () => { chatLog = []; agent.messages = []; welcome(); };
+  $("#impModel").onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f || busy) return;
+    const e2 = $(".examples", chat); if (e2) e2.remove();
+    addMsg("me", "匯入 " + f.name);
+    try { addMsg("ai", await agent.importFile(f.name, await f.arrayBuffer()), "匯入模型"); }
+    catch (err) { addMsg("ai", "⚠️ 匯入失敗：" + (err.message || err)); }
+  };
   const pend = store.get("pa_pending"); if (pend) { store.set("pa_pending", ""); send(pend); }
 };
 
@@ -350,6 +361,141 @@ S.library = async (v, arg) => {
       if (confirm(`確定要刪除「${d.title}」和它的所有版本嗎？`)) { await DB.del(d.id); go("library"); }
     };
   }
+};
+
+// ---------------------------------------------------------------- 匯入與分區編輯（移植 pa/ui/regionview.py）
+const RS = { history: [], sel: new Set(), explode: 0, log: [] };
+S.regions = (v) => {
+  const panel = new ModelPanel(ws);
+  const colors = ["紅", "橙", "黃", "綠", "藍", "淺藍", "紫", "粉紅", "黑", "白", "灰", "金", "咖啡"];
+  const box = h(`<div class="split3 regions">
+    <div class="card col" style="overflow:auto">
+      <h3>1. 匯入模型</h3><p class="muted">STL、OBJ（有材質群組會自動分區）、FBX、Maya .ma、3MF、GLB、PLY。Maya .mb 請先在 Maya 另存成 .ma 或匯出 .fbx。檔案只在這台裝置處理。</p>
+      <div class="row"><label class="btn">📂 開啟檔案<input type="file" id="rfile" accept=".stl,.obj,.fbx,.ma,.mb,.mtl,.3mf,.glb,.gltf,.ply" hidden></label>
+        <button class="btn outline" id="rcur" title="把零件設計或 AI 代理人剛做好的模型拿來分區">用目前的模型</button></div>
+      <h3>2. 分區</h3>
+      <label class="fld">分區方法<select id="rmeth">${Object.entries(RG.METHODS).map(([k, t]) => `<option value="${k}">${t}</option>`).join("")}</select></label>
+      <label class="fld">最多幾區<input type="number" id="rtarget" value="8" min="2" max="16" style="width:90px"></label>
+      <div class="row"><button class="btn accent" id="rseg">🧩 分區</button><button class="btn ghost" id="rundo">↶ 復原上一步</button></div>
+      <h3>拆開／組裝檢視</h3><p class="muted">每個區塊從物件中心往各自的方向拆開，看清楚每一塊；只影響畫面，不會改到模型。</p>
+      <div class="row"><button class="btn outline" id="rexp">↔ 拆開</button><button class="btn outline" id="rasm">→← 組裝</button></div>
+      <input type="range" id="rslide" min="0" max="1" step="0.05" value="${RS.explode}" style="accent-color:var(--primary)">
+      <div class="busy bar" id="rbusy" style="display:none"></div>
+      <h3>處理紀錄</h3><div id="rlog" class="col" style="gap:2px;font-size:12px"></div></div>
+    <div class="card col" style="overflow:auto">
+      <div class="row"><h3 style="flex:1">3. 區塊</h3><button class="btn ghost small" id="rall">全選</button><button class="btn ghost small" id="rnone">清除</button></div>
+      <div class="list" id="rlist2" style="max-height:300px"></div>
+      <h3>修改勾選的區塊</h3>
+      <div class="row"><button class="btn danger small" data-op="delete">🗑 刪除</button><button class="btn outline small" data-op="keep">只保留</button><button class="btn outline small" data-op="merge">合併</button></div>
+      <div class="row"><input type="number" id="rx" value="0" style="width:70px" title="X mm"><input type="number" id="ry" value="0" style="width:70px" title="Y mm"><input type="number" id="rz" value="0" style="width:70px" title="Z mm"><button class="btn outline small" data-op="move">✥ 移動（X Y Z mm）</button></div>
+      <div class="row"><input type="number" id="rfac" value="1.2" step="0.1" style="width:70px" title="倍數"><button class="btn outline small" data-op="scale">縮放</button>
+        <select id="rax"><option value="x">X</option><option value="y">Y</option><option value="z" selected>Z</option></select><input type="number" id="rdeg" value="90" style="width:70px" title="角度"><button class="btn outline small" data-op="rotate">↻ 旋轉</button></div>
+      <div class="row"><select id="rcol">${colors.map((c) => `<option ${c === "黑" ? "selected" : ""}>${c}</option>`).join("")}</select><button class="btn outline small" data-op="color">🎨 上色（耗材）</button><button class="btn ghost small" data-op="uncolor">取消顏色</button></div>
+      <div class="row"><input type="text" id="rname" placeholder="新名稱" style="width:150px"><button class="btn outline small" data-op="rename">改名</button></div>
+      <h3>整個模型</h3>
+      <div class="row"><select id="rshape"><option value="circle">圓形</option><option value="box">方形</option></select>
+        <label class="fld">直徑 mm<input type="number" id="rdia" value="3" step="0.1" style="width:80px"></label><label class="fld">深度／高 mm<input type="number" id="rdep" value="0" step="0.5" style="width:90px"></label></div>
+      <p class="muted" style="margin:0">鑽孔：深度 0＝貫穿；加凸台：填高度（0＝5 mm）；方向用上面的軸。</p>
+      <div class="row"><button class="btn outline small" id="rhole">⭘ 在勾選區中心鑽孔</button><button class="btn outline small" id="rboss">⊕ 在勾選區中心加凸台</button></div>
+      <div class="row"><button class="btn outline small" data-cut="x">✂ 沿 X 切兩半</button><button class="btn outline small" data-cut="y">✂ 沿 Y 切兩半</button><button class="btn outline small" data-cut="z">✂ 沿 Z 切兩半</button></div>
+    </div></div>`);
+  box.append(panel.el); v.append(box); panel.mount();
+  const log = (t, warn = false) => { RS.log.push([t, warn]); RS.log = RS.log.slice(-40); drawLog(); };
+  const drawLog = () => { $("#rlog").innerHTML = RS.log.map(([t, w]) => `<div style="color:${w ? "var(--warn)" : "var(--text)"}">${w ? "⚠️" : "✔"} ${esc(t)}</div>`).join(""); };
+  const num = (id) => { const x = Number($(id).value); if (!Number.isFinite(x)) throw new RG.EditError("請填數字"); return x; };
+  function draw() {
+    const rs = ws.parts ? RG.regions(ws.parts) : [];
+    RS.sel = new Set([...RS.sel].filter((i) => i <= rs.length));
+    $("#rlist2").innerHTML = rs.length ? rs.map((r) => `<label class="item ${RS.sel.has(r.id) ? "on" : ""}" style="font-weight:400">
+        <input type="checkbox" data-id="${r.id}" ${RS.sel.has(r.id) ? "checked" : ""}>
+        <span style="width:16px;height:16px;border-radius:8px;flex:none;background:${r.color};${r.filament ? "outline:2px solid var(--text)" : ""}"></span>
+        <span style="min-width:0"><b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.id}. ${esc(r.name)}</b>
+        <span class="muted" style="font-size:11px">${r.faces.toLocaleString()} 面 · ${r.size_mm.join("×")} mm · 中心 (${r.center_mm.join(", ")})</span></span></label>`).join("")
+      : `<p class="muted">${ws.parts ? "還沒分區：選分區方法後按「分區」" : "請先匯入模型"}</p>`;
+    $("#rlist2").querySelectorAll("[data-id]").forEach((c) => c.onchange = () => { const i = +c.dataset.id; if (c.checked) RS.sel.add(i); else RS.sel.delete(i); draw(); });
+    highlight();
+  }
+  function highlight() {
+    if (!ws.parts) return;
+    if (!RG.hasRegions(ws.parts) || (!RS.sel.size && RS.explode <= 0)) { panel.viewer.setParts(ws.parts, true); $(".info", panel.el).dataset.note = ""; return; }
+    const rgb = RG.dimmed(ws.parts, [...RS.sel]);
+    const shown = RS.explode > 0 ? RG.explodeView(ws.parts, RS.explode, rgb) : [{ ...ws.parts[0], rgb }];
+    panel.viewer.setParts(shown, true);
+    const [lo, hi] = MS.bounds(ws.parts);
+    $(".info", panel.el).textContent = hi.map((x, k) => +(x - lo[k]).toFixed(1)).join(" × ") + " mm · " + (ws.parts[0].idx.length / 3).toLocaleString() + " 面" +
+      (RS.explode > 0 ? "（拆開檢視，實際尺寸見下方）" : "");
+  }
+  function set(parts, title, msg, push) {
+    if (push && ws.parts) { RS.history.push([ws.parts, ws.title]); RS.history = RS.history.slice(-20); }
+    ws.set(parts, title || ws.title, null); ws.kind = "FILE";
+    panel.show(!!push);
+    if (msg) log(msg);
+    draw();
+  }
+  const busy = (on) => { $("#rbusy").style.display = on ? "" : "none"; };
+  const run = (fn) => {
+    if (!ws.parts) return toast("請先匯入模型", true);
+    busy(true);
+    setTimeout(() => {
+      try { const [p2, msg] = fn(); set(p2, null, msg, true); }
+      catch (e) { toast(e instanceof RG.EditError ? e.message : "處理失敗：" + e.message, true); console.error(e); }
+      busy(false);
+    }, 30);
+  };
+  const needSel = () => { if (!RS.sel.size) throw new RG.EditError("請先在區塊清單勾選要修改的區塊"); return [...RS.sel].sort((a, b) => a - b); };
+  const guard = (f) => () => { try { f(); } catch (e) { toast(e.message, true); } };
+  $("#rfile").onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+    busy(true);
+    try {
+      const r = await MS.loadFile(f.name, await f.arrayBuffer());
+      MS.placeOnPlate(r.parts);
+      RS.history = []; RS.sel.clear(); RS.log = []; RS.explode = 0; $("#rslide").value = 0;
+      const [lo, hi] = MS.bounds(r.parts), size = hi.map((x, k) => +(x - lo[k]).toFixed(1));
+      set(r.parts, f.name.replace(/\.[^.]+$/, ""), null, false); ws.designId = null;
+      log(`匯入：${f.name}（${r.parts.reduce((s, p) => s + p.idx.length / 3, 0).toLocaleString()} 面，${size.join("×")} mm${RG.hasRegions(r.parts) ? `，已有 ${RG.regions(r.parts).length} 個區塊` : ""}）`);
+      (r.notes || []).forEach((n) => log(n, true));
+      if (Math.max(...size) < 5) log(`模型只有 ${Math.max(...size).toFixed(2)} mm 大，單位可能是公分或公尺：用「縮放」把全部區塊放大 10 或 1000 倍`, true);
+    } catch (err) { toast("讀取失敗：" + err.message, true); }
+    busy(false);
+  };
+  $("#rcur").onclick = () => { if (!ws.parts) return toast("目前沒有模型；請先在零件設計或 AI 代理人做一個，或直接開啟檔案", true); RS.history = []; set(ws.parts, ws.title, "使用目前的模型：" + ws.title, false); };
+  $("#rseg").onclick = () => { const meth = $("#rmeth").value, n = Math.round(Number($("#rtarget").value) || 8);
+    run(() => { const p2 = RG.segment(ws.parts, meth, n); RS.sel.clear(); return [p2, `分區（${RG.METHODS[meth]}）：${RG.regions(p2).length} 區`]; }); };
+  $("#rundo").onclick = () => { if (!RS.history.length) return toast("沒有可以復原的步驟", true); const [p, t] = RS.history.pop(); set(p, t, "已復原上一步", false); };
+  $("#rall").onclick = () => { RS.sel = new Set(RG.regions(ws.parts || []).map((r) => r.id)); draw(); };
+  $("#rnone").onclick = () => { RS.sel.clear(); draw(); };
+  box.querySelectorAll("[data-op]").forEach((b) => b.onclick = guard(() => {
+    const op = b.dataset.op, sel = needSel(), kw = {};
+    if (op === "move") Object.assign(kw, { dx: num("#rx"), dy: num("#ry"), dz: num("#rz") });
+    if (op === "scale") kw.factor = num("#rfac");
+    if (op === "rotate") Object.assign(kw, { axis: $("#rax").value, degrees: num("#rdeg") });
+    if (op === "color") kw.color = $("#rcol").value;
+    if (op === "rename") kw.name = $("#rname").value;
+    if (op === "delete") RS.sel.clear();
+    run(() => RG.edit(ws.parts, op, sel, kw));
+  }));
+  $("#rhole").onclick = guard(() => { const sel = needSel(), d = num("#rdia"), dep = num("#rdep");
+    run(() => RG.edit(ws.parts, "hole", sel, { diameter: d, width: d, height: d, depth: dep || null, axis: $("#rax").value, shape: $("#rshape").value })); });
+  $("#rboss").onclick = guard(() => { const sel = needSel(), d = num("#rdia"), hh = num("#rdep") || 5;
+    run(() => RG.edit(ws.parts, "boss", sel, { diameter: d, width: d, height: hh, axis: $("#rax").value, shape: $("#rshape").value })); });
+  box.querySelectorAll("[data-cut]").forEach((b) => b.onclick = () => run(() => RG.edit(RG.toSingle(ws.parts), "cut", null, { axis: b.dataset.cut })));
+  const needRegions = () => { if (!ws.parts || !RG.hasRegions(ws.parts)) { toast("請先分區，才能拆開檢視", true); $("#rslide").value = 0; return false; } return true; };
+  $("#rslide").oninput = () => { if (!needRegions()) return; RS.explode = Number($("#rslide").value); highlight(); };
+  let anim = null;
+  const animate = (target) => {
+    if (!needRegions()) return;
+    clearInterval(anim);
+    const start = RS.explode, steps = 10; let i = 0;
+    anim = setInterval(() => {
+      i++; const t = i / steps;
+      RS.explode = start + (target - start) * (1 - (1 - t) ** 2); $("#rslide").value = RS.explode; highlight();
+      if (i >= steps) { clearInterval(anim); RS.explode = target; highlight(); }
+    }, 60);
+  };
+  $("#rexp").onclick = () => animate(1); $("#rasm").onclick = () => animate(0);
+  drawLog();
+  if (ws.parts) { panel.show(true); draw(); } else draw();
 };
 
 // ---------------------------------------------------------------- 檢查與修復

@@ -148,6 +148,12 @@ export function parse3MF(buf) {
 export async function loadFile(name, buf) {
   const ext = name.toLowerCase().split(".").pop(), notes = [];
   if (ext === "3mf") { const r = parse3MF(buf); r.notes = notes; return r; }
+  let cmObj = false;
+  if (["fbx", "ma", "mb", "mtl", "obj"].includes(ext)) {          // FBX、Maya、有材質群組的 OBJ：材質變成「區塊」（regions.js）
+    const R = await import("./regions.js"), g = R.loadGrouped(name, buf);
+    if (g && g.parts) return g;
+    cmObj = !!(g && g.cmObj);
+  }
   const THREE = await import("./lib/three.module.min.js");
   let obj;
   if (ext === "stl") { const { STLLoader } = await import("./lib/jsm/loaders/STLLoader.js"); obj = new THREE.Mesh(new STLLoader().parse(buf)); }
@@ -188,6 +194,13 @@ export async function loadFile(name, buf) {
     parts.push({ name: o.name || "模型", pos, idx, rgb });
   });
   if (!parts.length) throw new Error("檔案裡沒有任何三角面");
+  if (cmObj) { scaleParts(parts, 10); notes.push("OBJ 註明單位是公分，已換算成 mm（×10）"); }
+  if (ext === "obj" && parts.length > 1) {
+    const R = await import("./regions.js");
+    const one = R.toSingle(parts);
+    notes.push(`OBJ 有 ${parts.length} 個群組，已變成 ${one[0].labelNames.length} 個區塊（可以在「匯入與分區編輯」逐區修改）`);
+    return { parts: one, palette: [], notes };
+  }
   if (ext === "glb" || ext === "gltf") {
     const s = extent(parts);
     if (s > 0 && s < 0.5) { scaleParts(parts, 1000); notes.push("GLB 單位是公尺，已換算成 mm"); }

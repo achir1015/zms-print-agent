@@ -276,6 +276,122 @@ B.desk_hook = (v) => {
   return [["桌下掛鉤", m]];
 };
 
+// 額溫槍外殼（移植 pa/recipes.py build_thermo_gun）
+const tubeY = (d, length, y0, z = 0, d2 = null, x = 0) =>
+  Manifold.cylinder(length, d / 2, (d2 ?? d) / 2, SEG).rotate([90, 0, 0]).translate([x, y0, z]);
+const barY = (w, h, length, r, yc, zc = 0) => rrect(w, h, r).extrude(length).rotate([90, 0, 0]).translate([0, yc + length / 2, zc]);
+const bossX = (width, y, z, d = 6) => Manifold.cylinder(width, d / 2, d / 2, 48).rotate([0, 90, 0]).translate([-width / 2, y, z]);
+function screwHoles(shellW, y, z, sd) {
+  const pilot = Manifold.cylinder(shellW + 4, sd * 0.42, sd * 0.42, 32).rotate([0, 90, 0]).translate([-shellW / 2 - 2, y, z]);
+  const clear = Manifold.cylinder(shellW / 2 + 2, sd / 2 + 0.2, sd / 2 + 0.2, 32).rotate([0, 90, 0]).translate([-shellW / 2 - 2, y, z]);
+  const head = Manifold.cylinder(2.2, sd + 0.4, sd + 0.4, 32).rotate([0, 90, 0]).translate([-shellW / 2 - 0.2, y, z]);
+  return pilot.add(clear).add(head);
+}
+B.thermo_gun = (v) => {
+  const t = v.wall, r = v.corner, W = v.head_w, H = v.head_h, stick = Math.round(v.style) === 2;
+  const need = t * 2 + 22 + v.battery_l + 6 + v.board_l + 8;
+  const L = stick ? Math.max(v.head_l, need) : v.head_l;
+  const adds = [], subs = [], screws = [];
+  let outer = barY(W, H, L, r, 0);
+  let inner = barY(W - 2 * t, H - 2 * t, L - 2 * t, Math.max(r - t, 0.8), 0);
+  const nz = -H * 0.05;
+  const nose = tubeY(v.nose_d, v.nose_l + 4, -L / 2 + 4, nz, v.nose_d * 0.86);
+  outer = outer.add(nose);
+  subs.push(tubeY(v.sensor_d + 0.4, v.nose_l + 4 - 1.5, -L / 2 + 4, nz));
+  subs.push(tubeY(Math.max(v.sensor_d - 2, 3), 6, -L / 2 - v.nose_l + 3, nz));
+  const yb = -L / 2 + t + 22 + v.battery_l / 2;
+  const hl = v.handle_l, hW = v.handle_w, hD = v.handle_d, ang = v.handle_angle;
+  const ya = L / 2 - hD / 2 - 10, za = -H / 2 + 4;
+  const place = (m) => m.rotate([ang, 0, 0]).translate([0, ya, za]);
+  if (!stick) {
+    const hr = Math.min(r, hW / 2 - 1, hD / 2 - 1);
+    outer = outer.add(place(rrect(hW, hD, hr).extrude(hl + 4).translate([0, 0, -hl])));
+    inner = inner.add(place(rrect(hW - 2 * t, hD - 2 * t, Math.max(hr - t, 0.8)).extrude(hl + H / 2 + 4 - t).translate([0, 0, -hl + t])));
+    const yb0 = -hD / 2 + t + v.board_under + v.board_t / 2, zb0 = -hl + t + 0.5;
+    const xIn = hW / 2 - t, xTip = v.board_w / 2 - 1.5;
+    for (const sx of [-1, 1]) for (const dy of [-1, 1]) {
+      const y = yb0 + dy * (v.board_t / 2 + 0.25 + 0.6);
+      adds.push(place(Manifold.cube([xIn - xTip + 0.5, 1.2, v.board_l], false).translate([sx > 0 ? xTip : -xIn - 0.5, y - 0.6, zb0])));
+    }
+    if (v.usb) subs.push(place(Manifold.cube([v.usb_w, v.usb_h, t * 4 + 2], true).translate([0, yb0 + v.board_t / 2 + 1.6, -hl])));
+    subs.push(place(tubeY(v.button_d, t * 4, -hD / 2 + t * 2, -18)));
+    adds.push(place(bossX(hW - 2 * t, hD / 2 - t - 5, -hl + 12)));
+    screws.push(place(screwHoles(hW, hD / 2 - t - 5, -hl + 12, v.screw_d)));
+  } else {
+    inner = inner.subtract(nose);
+    const yBoard = yb + v.battery_l / 2 + 6 + v.board_l / 2, zb = -H / 2 + t + v.board_under + v.board_t / 2;
+    const xIn = W / 2 - t, xTip = v.board_w / 2 - 1.5;
+    for (const sx of [-1, 1]) for (const dz of [-1, 1]) {
+      const z = zb + dz * (v.board_t / 2 + 0.25 + 0.6);
+      adds.push(Manifold.cube([xIn - xTip + 0.5, v.board_l, 1.2], false).translate([sx > 0 ? xTip : -xIn - 0.5, yBoard - v.board_l / 2, z - 0.6]));
+    }
+    if (v.usb) subs.push(Manifold.cube([v.usb_w, t * 4 + 2, v.usb_h], true).translate([0, L / 2, zb + v.board_t / 2 + 1.6]));
+    subs.push(Manifold.cylinder(t * 4, v.button_d / 2, v.button_d / 2, SEG).translate([0, -L / 2 + 30, H / 2 - t * 2]));
+  }
+  for (const dy of [-1, 1])
+    adds.push(Manifold.cube([W - 2 * t + 0.2, 1.6, 5], false).translate([-(W - 2 * t + 0.2) / 2, yb + dy * (v.battery_l / 2 + 0.8) - 0.8, -H / 2 + t - 0.1]));
+  const ow = v.oled_w / 2 - 2.5, oh = v.oled_h / 2 - 2.5;
+  if (!stick) {
+    const zc = H * 0.12;
+    subs.push(Manifold.cube([v.win_w, t * 4, v.win_h], true).translate([0, L / 2 - t / 2, zc]));
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      adds.push(tubeY(4.5, 3.5, L / 2 - t + 0.01, zc + sz * oh, null, sx * ow));
+      subs.push(tubeY(1.8, 5, L / 2 - t + 0.01, zc + sz * oh, null, sx * ow));
+    }
+  } else {
+    const yc = -L / 2 + 45;
+    subs.push(Manifold.cube([v.win_w, v.win_h, t * 4], true).translate([0, yc, H / 2 - t / 2]));
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+      adds.push(Manifold.cylinder(3.5, 2.25, 2.25, 32).translate([sx * ow, yc + sy * oh, H / 2 - t - 3.5 + 0.01]));
+      subs.push(Manifold.cylinder(5, 0.9, 0.9, 24).translate([sx * ow, yc + sy * oh, H / 2 - t - 4.5]));
+    }
+  }
+  const zt = H / 2 - t - 5;
+  for (const [y, z] of [[-L / 2 + 14, zt], [L / 2 - 12, stick ? -H / 2 + t + 5 : zt]]) {
+    adds.push(bossX(W - 2 * t, y, z));
+    screws.push(screwHoles(W, y, z, v.screw_d));
+  }
+  let shell = outer.subtract(inner);
+  for (const f of adds) shell = shell.add(f.intersect(outer));
+  for (const f of [...subs, ...screws]) shell = shell.subtract(f);
+  shell = shell.translate([0, 0, -bbox(shell)[0][2]]);
+  if (!v.split) return [["額溫槍外殼（組合）", shell]];
+  const [lo, hi] = bbox(shell);
+  const big = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) * 3;
+  const right = shell.intersect(Manifold.cube([big, big, big], false).translate([0, -big / 2, -big / 2]));
+  const left = shell.intersect(Manifold.cube([big, big, big], false).translate([-big, -big / 2, -big / 2]));
+  const halves = [["左半殼", left.rotate([0, -90, 0])], ["右半殼", right.rotate([0, 90, 0])]];
+  if (v.style === 1) {
+    const nested = nestPair(halves[0][1], halves[1][1], 5);
+    if (nested) return [[halves[0][0], nested[0]], [halves[1][0], nested[1]]];
+  }
+  return sideBySide(halves, 10);
+};
+function nestPair(a, b, gap = 5, step = 3) {
+  b = b.rotate([0, 0, 180]);
+  const pa = a.project().offset(gap / 2, "Round", 2, 0), pb = b.project().offset(gap / 2, "Round", 2, 0);
+  const A = pa.bounds(), Bb = pb.bounds();
+  const [ax0, ay0] = A.min, [ax1, ay1] = A.max, [bx0, by0] = Bb.min, [bx1, by1] = Bb.max;
+  const side = Math.max(ax1 - ax0 + bx1 - bx0, Math.max(ay1 - ay0, by1 - by0));
+  const cands = [];
+  const nx = Math.floor((ax1 - ax0 + bx1 - bx0) / step) + 1, ny = Math.floor((ay1 - ay0 + by1 - by0) / step) + 1;
+  for (let i = 0; i <= nx; i++) for (let j = 0; j <= ny; j++) {
+    const dx = ax0 - bx1 + i * step, dy = ay0 - by1 + j * step;
+    const w = Math.max(ax1, bx1 + dx) - Math.min(ax0, bx0 + dx), d = Math.max(ay1, by1 + dy) - Math.min(ay0, by0 + dy);
+    if (Math.max(w, d) < side - 1) cands.push([Math.max(w, d), w + d, dx, dy]);
+  }
+  cands.sort((p, q) => p[0] - q[0] || p[1] - q[1] || p[2] - q[2] || p[3] - q[3]);
+  for (const [, , dx, dy] of cands) {
+    if (pa.intersect(pb.translate([dx, dy])).area() < 0.5) {
+      const b2 = b.translate([dx, dy, 0]), [al, ah] = bbox(a), [bl, bh] = bbox(b2);
+      const lo = al.map((x, k) => Math.min(x, bl[k])), hi = ah.map((x, k) => Math.max(x, bh[k]));
+      const c = [-(lo[0] + hi[0]) / 2, -(lo[1] + hi[1]) / 2, 0];
+      return [a.translate(c).translate([0, 0, -al[2]]), b2.translate(c).translate([0, 0, -bl[2]])];
+    }
+  }
+  return null;
+}
+
 // ------------------------------------------------------------------ 對外
 export const RECIPES = DATA.recipes;
 export const BY_ID = Object.fromEntries(RECIPES.map((r) => [r.id, r]));
@@ -313,4 +429,10 @@ export function build(rid, values) {
   } finally {
     cleanup();
   }
+}
+
+/** 給分區編輯（regions.js）用的 manifold 類別：鑽孔、加凸台、切開。 */
+export function manifoldKit() {
+  if (!M) throw new Error("建模引擎尚未載入");
+  return { Manifold, Mesh: M.Mesh, release: cleanup };
 }

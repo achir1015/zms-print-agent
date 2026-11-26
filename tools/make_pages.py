@@ -29,7 +29,7 @@ LIBS = {  # npm 套件版本固定
     "manifold-3d": "3.5.5", "three": "0.180.0",
 }
 # 只有電腦版能做的畫面：線上版另外處理
-WEB_PAGES = ("home", "agent", "design", "library", "check", "convert", "search", "aiset", "help")
+WEB_PAGES = ("home", "agent", "design", "library", "regions", "check", "convert", "search", "aiset", "help")
 
 
 def data():
@@ -71,6 +71,11 @@ def write_data():
             shutil.copyfile(os.path.join(HERE, "assets", "voice", n), os.path.join(vo, n))
     for d in (DOCS, APP):
         shutil.copyfile(os.path.join(HERE, "assets", "icon.png"), os.path.join(d, "icon.png"))
+    # Bambu 多色 3MF 的專案設定範本（regions.js 匯出有指定耗材顏色的區塊時用）
+    tpl = os.path.join(HERE, "vendor", "bsa", "bambu_studio_ai", "color", "bambu_template")
+    os.makedirs(os.path.join(APP, "bambu"), exist_ok=True)
+    for n in ("project_settings.config", "per_filament_keys.json"):
+        shutil.copyfile(os.path.join(tpl, n), os.path.join(APP, "bambu", n))
     print("ok data.js、voice、icon")
 
 

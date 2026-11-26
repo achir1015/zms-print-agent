@@ -42,3 +42,29 @@ def test_checks_match_python():
         rep = checks.check(mesh3d.from_manifold(p), "A1 Mini", "PETG", "functional", quick=False)
         assert "".join(i["status"][0] for i in rep["items"]) == js[r.id]["st"], r.id
         assert abs(rep["score"] - js[r.id]["score"]) <= 0.3, r.id
+
+
+def test_regions_match_python(tmp_path):
+    """線上版匯入（FBX／MA／OBJ 材質群組）與分區編輯，和電腦版一致。"""
+    from pa import segment
+    import trimesh
+    base = os.path.dirname(HERE)
+    files = [os.path.join(base, "數位溫度計3D模型." + e) for e in ("fbx", "ma")]
+    files = [f for f in files if os.path.isfile(f)]
+    if os.name == "nt" and not os.path.isfile(NODE):
+        pytest.skip("沒有 Node 22")
+    out = subprocess.run([NODE, os.path.join(HERE, "tools", "webref", "regions.mjs"), APP.replace("\\", "/")] + [f.replace("\\", "/") for f in files],
+                         capture_output=True, text=True, encoding="utf-8", check=True).stdout
+    js = json.loads(out.strip().splitlines()[-1])
+    for f in files:
+        m = mesh3d.load(f)
+        w = js["files"][f.replace("\\", "/")]
+        assert w["names"] == [r["name"] for r in segment.regions(m)], f
+        assert all(abs(a - b) < 0.05 for a, b in zip(m.combined().extents, w["size"])), f
+    v, parts = recipes.build("block", {"width": 40, "depth": 40, "height": 20})
+    s = segment.segment(mesh3d.from_manifold(parts), "surface", target=6)
+    assert js["ops"]["surface"] == len(segment.regions(s))
+    for op, kw, ids in (("hole", {"at": [0, 0, 10], "diameter": 8}, None), ("cut", {"axis": "z", "value": 10, "keep": "both"}, None),
+                        ("boss", {"diameter": 6, "height": 5}, [2])):
+        m2, _ = segment.edit(s, op, ids, **kw)
+        assert all(abs(a - b) < 0.05 for a, b in zip(m2.combined().extents, js["ops"][op])), op
